@@ -1,0 +1,345 @@
+default
+
+
+GET
+/info
+Get Info
+
+Parameters
+Try it out
+No parameters
+
+Responses
+Code	Description	Links
+200	
+Successful Response
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+{
+  "Alias": [
+    "string"
+  ],
+  "Buzon": {
+    "additionalProp1": {
+      "remi": "string",
+      "dest": "string",
+      "asunto": "string",
+      "cuerpo": "string",
+      "id": "string"
+    },
+    "additionalProp2": {
+      "remi": "string",
+      "dest": "string",
+      "asunto": "string",
+      "cuerpo": "string",
+      "id": "string"
+    },
+    "additionalProp3": {
+      "remi": "string",
+      "dest": "string",
+      "asunto": "string",
+      "cuerpo": "string",
+      "id": "string"
+    }
+  },
+  "Recursos": {
+    "additionalProp1": 0,
+    "additionalProp2": 0,
+    "additionalProp3": 0
+  },
+  "Objetivo": {
+    "additionalProp1": 0,
+    "additionalProp2": 0,
+    "additionalProp3": 0
+  }
+}
+No links
+
+POST
+/alias/{nombre}
+Add Alias
+
+Parameters
+Try it out
+Name	Description
+nombre *
+string
+(path)
+nombre
+Responses
+Code	Description	Links
+200	
+Successful Response
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+{
+  "additionalProp1": {}
+}
+No links
+422	
+Validation Error
+
+Media type
+
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string"
+    }
+  ]
+}
+No links
+
+DELETE
+/alias/{nombre}
+Delete Alias
+
+Parameters
+Try it out
+Name	Description
+nombre *
+string
+(path)
+nombre
+Responses
+Code	Description	Links
+200	
+Successful Response
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+{
+  "additionalProp1": {}
+}
+No links
+422	
+Validation Error
+
+Media type
+
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string"
+    }
+  ]
+}
+No links
+
+POST
+/carta
+Send Carta
+
+Parameters
+Try it out
+No parameters
+
+Request body
+
+application/json
+Example Value
+Schema
+{
+  "remi": "string",
+  "dest": "string",
+  "asunto": "string",
+  "cuerpo": "string",
+  "id": "string"
+}
+Responses
+Code	Description	Links
+200	
+Successful Response
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+{
+  "additionalProp1": {}
+}
+No links
+422	
+Validation Error
+
+Media type
+
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string"
+    }
+  ]
+}
+No links
+
+GET
+/gente
+Get Gente
+
+Parameters
+Try it out
+No parameters
+
+Responses
+Code	Description	Links
+200	
+Successful Response
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+[
+  "string"
+]
+No links
+
+POST
+/paquete
+Send Paquete
+
+Parameters
+Try it out
+Name	Description
+dest *
+string
+(query)
+dest
+Request body
+
+application/json
+Example Value
+Schema
+{
+  "additionalProp1": 0,
+  "additionalProp2": 0,
+  "additionalProp3": 0
+}
+Responses
+Code	Description	Links
+200	
+Successful Response
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+{
+  "additionalProp1": {}
+}
+No links
+422	
+Validation Error
+
+Media type
+
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string"
+    }
+  ]
+}
+No links
+
+DELETE
+/mail/{uid}
+Delete Mail
+
+Parameters
+Try it out
+Name	Description
+uid *
+string
+(path)
+uid
+Responses
+Code	Description	Links
+200	
+Successful Response
+
+Media type
+
+application/json
+Controls Accept header.
+Example Value
+Schema
+{
+  "additionalProp1": {}
+}
+No links
+422	
+Validation Error
+
+Media type
+
+application/json
+Example Value
+Schema
+{
+  "detail": [
+    {
+      "loc": [
+        "string",
+        0
+      ],
+      "msg": "string",
+      "type": "string"
+    }
+  ]
+}
+No links
+
