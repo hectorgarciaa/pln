@@ -10,11 +10,12 @@ def mostrar_menu():
     print("="*60)
     print("1. GET /info - Obtener información general")
     print("2. GET /gente - Obtener lista de personas")
-    print("3. POST /alias/{nombre} - Añadir un alias")
-    print("4. DELETE /alias/{nombre} - Eliminar un alias")
-    print("5. POST /carta - Enviar una carta")
-    print("6. POST /paquete - Enviar un paquete")
-    print("7. DELETE /mail/{uid} - Eliminar un mail")
+    print("3. GET /info/{usuario} - Ver materiales de un usuario")
+    print("4. POST /alias/{nombre} - Añadir un alias")
+    print("5. DELETE /alias/{nombre} - Eliminar un alias")
+    print("6. POST /carta - Enviar una carta")
+    print("7. POST /paquete - Enviar un paquete")
+    print("8. DELETE /mail/{uid} - Eliminar un mail")
     print("0. Salir")
     print("="*60)
 
@@ -42,8 +43,80 @@ def get_gente():
             print("\n✓ Lista de personas:")
             for persona in data:
                 print(f"  - {persona}")
+            return data  # Retornar la lista para uso interno
         else:
             print(f"✗ Error {response.status_code}: {response.text}")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"✗ Error de conexión: {e}")
+        return None
+
+def get_user_info():
+    """GET /info/{usuario} - Obtiene los materiales/recursos de un usuario específico"""
+    # Primero obtenemos la lista de usuarios
+    url_gente = f"{BASE_URL}/gente"
+    try:
+        response_gente = requests.get(url_gente)
+        if response_gente.status_code != 200:
+            print(f"✗ Error al obtener lista de usuarios: {response_gente.status_code}")
+            return
+        
+        usuarios = response_gente.json()
+        print("\n--- Usuarios disponibles ---")
+        for i, usuario in enumerate(usuarios, 1):
+            print(f"{i}. {usuario}")
+        
+        # Pedimos al usuario que seleccione
+        usuario = input("\nIntroduce el nombre del usuario: ").strip()
+        if not usuario:
+            print("✗ El nombre de usuario no puede estar vacío")
+            return
+        
+        # Intentamos obtener información del usuario
+        url = f"{BASE_URL}/info/{usuario}"
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            print(f"\n✓ Información de '{usuario}':")
+            
+            # Mostrar recursos si existen
+            if "Recursos" in data:
+                print("\n  Recursos/Materiales:")
+                recursos = data["Recursos"]
+                if recursos:
+                    for recurso, cantidad in recursos.items():
+                        print(f"    • {recurso}: {cantidad}")
+                else:
+                    print("    (Sin recursos)")
+            
+            # Mostrar objetivo si existe
+            if "Objetivo" in data:
+                print("\n  Objetivo:")
+                objetivo = data["Objetivo"]
+                if objetivo:
+                    for recurso, cantidad in objetivo.items():
+                        print(f"    • {recurso}: {cantidad}")
+                else:
+                    print("    (Sin objetivos definidos)")
+            
+            # Mostrar alias si existen
+            if "Alias" in data:
+                print(f"\n  Alias: {', '.join(data['Alias']) if data['Alias'] else 'ninguno'}")
+            
+            # Mostrar información del buzón si existe
+            if "Buzon" in data:
+                num_mensajes = len(data["Buzon"])
+                print(f"\n  Mensajes en buzón: {num_mensajes}")
+            
+        elif response.status_code == 404:
+            print(f"✗ Usuario '{usuario}' no encontrado")
+        elif response.status_code == 422:
+            print(f"✗ Error de validación (422)")
+            print("Detalle:", response.json())
+        else:
+            print(f"✗ Error {response.status_code}: {response.text}")
+    
     except requests.exceptions.RequestException as e:
         print(f"✗ Error de conexión: {e}")
 
@@ -198,14 +271,16 @@ def main():
         elif opcion == "2":
             get_gente()
         elif opcion == "3":
-            add_alias()
+            get_user_info()
         elif opcion == "4":
-            delete_alias()
+            add_alias()
         elif opcion == "5":
-            send_carta()
+            delete_alias()
         elif opcion == "6":
-            send_paquete()
+            send_carta()
         elif opcion == "7":
+            send_paquete()
+        elif opcion == "8":
             delete_mail()
         elif opcion == "0":
             print("\n¡Hasta luego!")
