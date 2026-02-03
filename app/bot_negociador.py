@@ -10,9 +10,9 @@ OLLAMA_URL = "http://localhost:11434"
 
 class BotNegociador:
     """
-    Bot de negociación avanzado que usa Ollama con Qwen para conseguir recursos.
-    Implementa estrategias de negociación sofisticadas y persuasión psicológica.
-    INCLUYE: Sistema anti-robos y capacidad de estafa estratégica.
+    Bot de negociación amigable que usa Ollama con Qwen para conseguir recursos.
+    Implementa estrategias de negociación colaborativas y justas.
+    INCLUYE: Sistema anti-robos para protección.
     """
     
     def __init__(self, alias: str, modelo: str = "qwen3-vl:8b"):
@@ -22,9 +22,6 @@ class BotNegociador:
         self.gente = []
         self.historial_negociaciones = {}
         self.lista_negra = []  # Personas que intentaron robarnos
-        self.victimas_estafa = []  # A quienes vamos a estafar
-        self.ofertas_falsas = {}  # Ofertas que no pensamos cumplir
-        self.nivel_paranoia = 0.7  # 0-1: qué tan defensivo somos
         
     def obtener_info(self) -> Dict:
         """Obtiene información actual de la API"""
@@ -153,7 +150,7 @@ class BotNegociador:
             return ""
     
     def detectar_intento_robo(self, carta: Dict) -> bool:
-        """Detecta si una oferta es un intento de robo/estafa"""
+        """Detecta si una oferta es un intento de robo"""
         mensaje = carta.get('cuerpo', '').lower()
         asunto = carta.get('asunto', '').lower()
         remitente = carta.get('remi', 'Desconocido')
@@ -176,7 +173,7 @@ class BotNegociador:
         
         # Para casos ambiguos, usar IA (solo si es necesario)
         if sospecha_count >= 2:
-            prompt = f"""¿Es estafa? Responde ROBO o LEGIT en una palabra.
+            prompt = f"""¿Es robo? Responde ROBO o LEGIT en una palabra.
 Mensaje: {mensaje[:200]}"""
             respuesta = self.consultar_ollama(prompt, timeout=30, usar_fallback=False)
             
@@ -184,72 +181,13 @@ Mensaje: {mensaje[:200]}"""
             
             if es_robo and remitente not in self.lista_negra:
                 self.lista_negra.append(remitente)
-                print(f"⚠️  ALERTA: {remitente} intentó estafar (IA). Lista negra.")
+                print(f"⚠️  ALERTA: {remitente} intentó robar (IA). Lista negra.")
             
             return es_robo
         
         return False
     
-    def identificar_victima_estafa(self) -> str:
-        """Identifica a quién podemos estafar con más éxito"""
-        # Evitar personas en lista negra (podrían ser más listos)
-        candidatos = [p for p in self.gente 
-                     if p != self.alias 
-                     and p not in self.lista_negra
-                     and p not in self.victimas_estafa]
-        
-        if not candidatos:
-            return None
-        
-        # Por ahora, elegir al azar (se podría sofisticar)
-        import random
-        victima = random.choice(candidatos)
-        self.victimas_estafa.append(victima)
-        return victima
-    
-    def generar_oferta_trampa(self, destinatario: str) -> Dict:
-        """Genera una oferta IRRESISTIBLE que NO vamos a cumplir"""
-        oro_actual = self.obtener_oro_actual()
-        necesidades = self.calcular_necesidades()
-        
-        prompt = f"""TRAMPA para {destinatario}.
 
-Ofrece: 50 oro + recursos
-Pide: Que envíe PRIMERO
-Urgencia: Solo hoy
-
-Genera (max 150 chars):
-ASUNTO: [gancho]
-CUERPO: [oferta irresistible + "envía primero"]"""
-        
-        respuesta = self.consultar_ollama(prompt)
-        
-        # Parsear
-        estrategia = {'asunto': '', 'cuerpo': ''}
-        asunto_match = re.search(r'ASUNTO:\s*(.+?)(?=CUERPO:|$)', respuesta, re.DOTALL)
-        cuerpo_match = re.search(r'CUERPO:\s*(.+)', respuesta, re.DOTALL)
-        
-        if asunto_match:
-            estrategia['asunto'] = asunto_match.group(1).strip()
-        if cuerpo_match:
-            estrategia['cuerpo'] = cuerpo_match.group(1).strip()
-        
-        # Fallback si no parsea - TRAMPA MEJORADA
-        if not estrategia['asunto']:
-            estrategia['asunto'] = f"🎁 REGALO: 50 oro + Recursos para {destinatario}"
-        if not estrategia['cuerpo']:
-            # Hacer trampa más creíble
-            if necesidades:
-                recurso_necesitado = list(necesidades.keys())[0]
-                cantidad = necesidades[recurso_necesitado]
-                estrategia['cuerpo'] = f"¡{destinatario}! Tengo EXCESO de oro (50) que necesito gastar YA por límite del sistema. Te lo doy + recursos si me ayudas enviando {cantidad} {recurso_necesitado} primero. Luego te transfiero el oro doble. ¡Aprovecha ahora!"
-            else:
-                estrategia['cuerpo'] = f"¡{destinatario}! Bug del juego me dio oro extra (50). Te lo regalo si me envías cualquier recurso primero para 'activar' la transferencia. Luego te mando el oro + más recursos. ¡Solo hoy!"
-        
-        # Guardar para no cumplirla
-        self.ofertas_falsas[destinatario] = estrategia
-        
-        return estrategia
     
     def generar_estrategia_negociacion(self, destinatario: str, necesidades: Dict[str, int], 
                                        excedentes: Dict[str, int]) -> Dict:
@@ -258,32 +196,30 @@ CUERPO: [oferta irresistible + "envía primero"]"""
         Incluye técnicas de persuasión, anclaje, escasez y maximización de oro.
         CON protección anti-robos.
         """
-        # Si está en lista negra, generar trampa
-        if destinatario in self.lista_negra:
-            print(f"🎭 {destinatario} está en lista negra - Generando TRAMPA")
-            return self.generar_oferta_trampa(destinatario)
+        oro_actual = self.obtener_oro_actual()
+        objetivo_completo = self.objetivo_completado()
         
-        # Si ya completamos el objetivo, el foco es 100% acumular oro
+        # Si ya completamos el objetivo, el foco es vender excedentes
         if objetivo_completo:
-            enfoque = "VENDER POR ORO"
+            enfoque = "VENDER excedentes de forma justa"
         else:
-            enfoque = "CONSEGUIR recursos, pedir ORO"
+            enfoque = "INTERCAMBIAR recursos de forma colaborativa"
         
-        prompt = f"""Negociador experto. Objetivo: {enfoque}
+        prompt = f"""Negociador amigable y justo. Objetivo: {enfoque}
 
 Tú: {self.alias}, Oro: {oro_actual}
 Destinatario: {destinatario}
 Necesitas: {json.dumps(necesidades, ensure_ascii=False)}
 Tienes: {json.dumps(excedentes, ensure_ascii=False)}
 
-Genera carta (max 200 chars):
-- Pide ORO siempre
-- Crea urgencia
-- Usa escasez
+Genera carta amigable (max 200 chars):
+- Tono colaborativo
+- Intercambio justo
+- Beneficio mutuo
 
 FORMATO:
-ASUNTO: [título]
-CUERPO: [mensaje corto]"""
+ASUNTO: [título amigable]
+CUERPO: [mensaje colaborativo]"""
         
         respuesta = self.consultar_ollama(prompt)
         
@@ -306,29 +242,29 @@ CUERPO: [mensaje corto]"""
         if estrategia_match:
             estrategia['descripcion_estrategia'] = estrategia_match.group(1).strip()
         
-        # Si no se parseó correctamente, usar fallback INTELIGENTE
+        # Si no se parseó correctamente, usar fallback COLABORATIVO
         if not estrategia['asunto'] or not estrategia['cuerpo']:
             # Generar mensaje basado en necesidades reales
             if necesidades:
                 primer_recurso = list(necesidades.keys())[0]
                 cantidad = necesidades[primer_recurso]
-                estrategia['asunto'] = f"💰 Necesito {primer_recurso} - Oferta en oro"
+                estrategia['asunto'] = f"🤝 Propuesta de intercambio - {primer_recurso}"
                 
                 if excedentes:
                     primer_excedente = list(excedentes.keys())[0]
                     cant_excedente = excedentes[primer_excedente]
-                    estrategia['cuerpo'] = f"Hola {destinatario}! Busco {cantidad} de {primer_recurso}. Tengo {cant_excedente} {primer_excedente} para intercambiar + oro si hace falta. ¿Tienes disponible? Responde con tu precio."
+                    estrategia['cuerpo'] = f"Hola {destinatario}! Busco {cantidad} de {primer_recurso}. Tengo {cant_excedente} {primer_excedente} para intercambiar. ¿Te interesa un trueque justo? ¡Saludos!"
                 else:
-                    estrategia['cuerpo'] = f"Hola {destinatario}! Necesito {cantidad} de {primer_recurso}. Pago en oro. ¿Cuánto tienes y a qué precio? Responde rápido."
+                    estrategia['cuerpo'] = f"Hola {destinatario}! Necesito {cantidad} de {primer_recurso}. Puedo pagar en oro a precio justo. ¿Tienes disponible? ¡Gracias!"
             elif excedentes:
-                # Solo venta por oro
+                # Solo oferta de venta
                 primer_excedente = list(excedentes.keys())[0]
                 cant_excedente = excedentes[primer_excedente]
-                estrategia['asunto'] = f"💎 Vendo {primer_excedente} - Solo Oro"
-                estrategia['cuerpo'] = f"Hola {destinatario}! Vendo {cant_excedente} {primer_excedente}. Precio: {cant_excedente * 10} oro (negociable). Varios interesados, responde pronto si quieres."
+                estrategia['asunto'] = f"💼 Ofrezco {primer_excedente}"
+                estrategia['cuerpo'] = f"Hola {destinatario}! Tengo {cant_excedente} {primer_excedente} disponible. Si te interesa, hablamos precio justo. ¡Saludos!"
             else:
-                estrategia['asunto'] = f"🔥 Oportunidad Exclusiva - Recursos Premium"
-                estrategia['cuerpo'] = f"Hola {destinatario}! Tengo acceso a recursos escasos. ¿Qué necesitas? Hablamos precios en oro."
+                estrategia['asunto'] = f"👋 Hola desde {self.alias}"
+                estrategia['cuerpo'] = f"Hola {destinatario}! ¿Qué recursos tienes disponibles? Podemos hacer un intercambio colaborativo. ¡Saludos!"
         
         return estrategia
     
@@ -357,34 +293,34 @@ CUERPO: [mensaje corto]"""
     
     def analizar_respuesta(self, carta: Dict) -> Dict:
         """
-        Analiza una respuesta recibida y genera una contra-oferta inteligente.
-        Detecta debilidades, oportunidades para extraer ORO, e INTENTOS DE ROBO.
+        Analiza una respuesta recibida y genera una contra-oferta constructiva.
+        Detecta oportunidades para intercambios justos y INTENTOS DE ROBO.
         """
         # PRIMERO: Detectar si es intento de robo
         if self.detectar_intento_robo(carta):
             return {
                 'evaluacion': 'INTENTO DE ROBO DETECTADO',
-                'debilidades': 'Es un estafador',
-                'contraoferta': 'IGNORAR o ESTAFAR DE VUELTA',
-                'tactica': f'Añadido {carta.get("remi")} a lista negra. Considerar venganza.',
+                'debilidades': 'Intentó robarnos',
+                'contraoferta': 'IGNORAR - No es confiable',
+                'tactica': f'Añadido {carta.get("remi")} a lista negra. No negociar.',
                 'respuesta_completa': '🚨 ALERTA: Esta persona intentó robarte. No negociar.'
             }
         
         oro_actual = self.obtener_oro_actual()
         objetivo_completo = self.objetivo_completado()
         
-        prompt = f"""Analiza oferta. Objetivo: MAX ORO
+        prompt = f"""Analiza oferta. Responde colaborativo.
 
 Oro actual: {oro_actual}
 De: {carta.get('remi')}
 Mensaje: {carta.get('cuerpo')[:150]}
 
-¿Desesperado? ¿Cuánto oro cobrar?
-
 Respuesta corta:
-EVALUACION: [Alto/Medio/Bajo]
-ORO: [cantidad a cobrar]
-TACTICA: [cómo presionar]"""
+EVALUACION: [interesante/no interesante]
+TACTICA: [cómo responder]"""
+        
+        respuesta = self.consultar_ollama(prompt)
+        
         analisis = {
             'evaluacion': '',
             'debilidades': '',
@@ -394,17 +330,11 @@ TACTICA: [cómo presionar]"""
         }
         
         # Parsear respuesta
-        eval_match = re.search(r'EVALUACION:\s*(.+?)(?=DEBILIDADES:|$)', respuesta, re.DOTALL)
-        deb_match = re.search(r'DEBILIDADES:\s*(.+?)(?=CONTRAOFERTA:|$)', respuesta, re.DOTALL)
-        contra_match = re.search(r'CONTRAOFERTA:\s*(.+?)(?=TACTICA:|$)', respuesta, re.DOTALL)
+        eval_match = re.search(r'EVALUACION:\s*(.+?)(?=TACTICA:|$)', respuesta, re.DOTALL)
         tac_match = re.search(r'TACTICA:\s*(.+)', respuesta, re.DOTALL)
         
         if eval_match:
             analisis['evaluacion'] = eval_match.group(1).strip()
-        if deb_match:
-            analisis['debilidades'] = deb_match.group(1).strip()
-        if contra_match:
-            analisis['contraoferta'] = contra_match.group(1).strip()
         if tac_match:
             analisis['tactica'] = tac_match.group(1).strip()
         
@@ -431,9 +361,9 @@ TACTICA: [cómo presionar]"""
         Contacta a múltiples personas con estrategias personalizadas.
         """
         print("="*70)
-        print("🤖 INICIANDO BOT DE NEGOCIACIÓN AVANZADO")
+        print("🤖 INICIANDO BOT DE NEGOCIACIÓN COLABORATIVO")
         print("🛡️  Protección anti-robos: ACTIVADA")
-        print("🎭 Modo estafa estratégica: DISPONIBLE")
+        print("🤝 Modo: Intercambios justos y colaborativos")
         print("="*70)
         
         # 1. Obtener información actualizada
@@ -473,28 +403,19 @@ TACTICA: [cómo presionar]"""
         
         print(f"\n👥 OBJETIVOS IDENTIFICADOS: {len(personas_objetivo)} personas")
         
-        # 4. Identificar víctima para estafa (1 persona)
-        victima = self.identificar_victima_estafa()
-        if victima:
-            print(f"\n🎯 VÍCTIMA IDENTIFICADA: {victima}")
-            print("   Preparando oferta TRAMPA irresistible...")
-        
-        # 5. Generar y enviar propuestas a cada persona
+        # 4. Generar y enviar propuestas a cada persona
         print("\n📤 ENVIANDO PROPUESTAS DE NEGOCIACIÓN...")
         print("-"*70)
         
         exitosas = 0
         for persona in personas_objetivo:
-            # Determinar si es la víctima de estafa
-            es_victima = (persona == victima)
             es_lista_negra = (persona in self.lista_negra)
             
-            if es_victima:
-                print(f"\n🎭 ESTAFANDO A: {persona} 💀")
-            elif es_lista_negra:
-                print(f"\n⚔️  VENGANZA CONTRA: {persona} (intentó robarnos)")
+            if es_lista_negra:
+                print(f"\n⚠️  EVITANDO: {persona} (lista negra)")
+                continue
             else:
-                print(f"\n🎲 Negociando con: {persona}")
+                print(f"\n🤝 Negociando con: {persona}")
             
             # Generar estrategia personalizada
             estrategia = self.generar_estrategia_negociacion(
@@ -552,8 +473,7 @@ TACTICA: [cómo presionar]"""
             print("3. Enviar carta personalizada")
             print("4. Ver estado actual")
             print("5. Consultar estrategia para un objetivo")
-            print("6. 🎭 ESTAFAR a alguien (oferta trampa)")
-            print("7. 🛡️  Ver lista negra")
+            print("6. 🛡️  Ver lista negra")
             print("0. Salir")
             print("="*70)
             
@@ -637,35 +557,12 @@ TACTICA: [cómo presionar]"""
                     print(f"\nTécnicas aplicadas:\n{estrategia['descripcion_estrategia']}")
             
             elif opcion == "6":
-                dest = input("¿A quién quieres ESTAFAR?: ").strip()
-                if dest:
-                    print(f"\n🎭 Generando TRAMPA para {dest}...")
-                    trampa = self.generar_oferta_trampa(dest)
-                    
-                    print(f"\n🎯 OFERTA TRAMPA GENERADA:")
-                    print(f"\nAsunto: {trampa['asunto']}")
-                    print(f"\nCuerpo: {trampa['cuerpo']}")
-                    print(f"\n⚠️  IMPORTANTE: Una vez que te envíe recursos, NO CUMPLAS tu parte.")
-                    print(f"   Simplemente ignora o responde con 'hubo un error'.")
-                    
-                    if input("\n¿Enviar trampa? (s/n): ").lower() == 's':
-                        if self.enviar_carta_negociacion(dest, trampa['asunto'], trampa['cuerpo']):
-                            print(f"✓ Trampa enviada a {dest}. Espera a que muerda el anzuelo...")
-            
-            elif opcion == "7":
                 print("\n🛡️  LISTA NEGRA (intentaron robarnos):")
                 if self.lista_negra:
                     for persona in self.lista_negra:
                         print(f"  ⚠️  {persona}")
                 else:
-                    print("  (vacía)")
-                
-                print("\n🎭 VÍCTIMAS DE NUESTRAS ESTAFAS:")
-                if self.victimas_estafa:
-                    for persona in self.victimas_estafa:
-                        print(f"  💀 {persona}")
-                else:
-                    print("  (ninguna todavía)")
+                    print("  (vacía - nadie ha intentado robar)")
             
             elif opcion == "0":
                 print("\n¡Hasta luego, negociador!")
