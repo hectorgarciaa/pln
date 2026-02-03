@@ -15,7 +15,7 @@ class BotNegociador:
     INCLUYE: Sistema anti-robos y capacidad de estafa estratégica.
     """
     
-    def __init__(self, alias: str, modelo: str = "qwen2.5:7b"):
+    def __init__(self, alias: str, modelo: str = "qwen3-vl:8b"):
         self.alias = alias
         self.modelo = modelo
         self.info_actual = None
@@ -750,14 +750,8 @@ def main():
         print("✗ Necesitas especificar tu alias")
         return
     
-    print("\nModelos disponibles comunes:")
-    print("  - qwen2.5:7b (recomendado - rápido)")
-    print("  - qwen2.5:14b (más inteligente, más lento)")
-    print("  - qwen2.5-vl:8b (multimodal)")
-    
-    modelo = input("\n¿Qué modelo usar? [qwen2.5:7b]: ").strip()
-    if not modelo:
-        modelo = "qwen2.5:7b"
+    modelo = "qwen3-vl:8b"
+    print(f"\n{modelo}")
     
     # Crear bot
     bot = BotNegociador(alias, modelo)
