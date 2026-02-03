@@ -12,14 +12,19 @@ class BotNegociador:
     """
     Bot de negociación avanzado que usa Ollama con Qwen para conseguir recursos.
     Implementa estrategias de negociación sofisticadas y persuasión psicológica.
+    INCLUYE: Sistema anti-robos y capacidad de estafa estratégica.
     """
     
-    def __init__(self, alias: str, modelo: str = "qwen2.5:latest"):
+    def __init__(self, alias: str, modelo: str = "qwen2.5:7b"):
         self.alias = alias
         self.modelo = modelo
         self.info_actual = None
         self.gente = []
         self.historial_negociaciones = {}
+        self.lista_negra = []  # Personas que intentaron robarnos
+        self.victimas_estafa = []  # A quienes vamos a estafar
+        self.ofertas_falsas = {}  # Ofertas que no pensamos cumplir
+        self.nivel_paranoia = 0.7  # 0-1: qué tan defensivo somos
         
     def obtener_info(self) -> Dict:
         """Obtiene información actual de la API"""
@@ -118,6 +123,8 @@ class BotNegociador:
                     "prompt": prompt,
                     "stream": False,
                     "temperature": 0.8,
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1,
                 },
                 timeout=60
             )
@@ -131,12 +138,121 @@ class BotNegociador:
             print(f"⚠ Error consultando Ollama: {e}")
             return ""
     
+    def detectar_intento_robo(self, carta: Dict) -> bool:
+        """Detecta si una oferta es un intento de robo/estafa"""
+        prompt = f"""Analiza si esta oferta es un INTENTO DE ROBO o ESTAFA:
+
+De: {carta.get('remi', 'Desconocido')}
+Asunto: {carta.get('asunto', '')}
+Mensaje: {carta.get('cuerpo', '')}
+
+INDICADORES DE ESTAFA:
+1. Pide MUCHO más de lo que ofrece
+2. Ofrece "favores futuros" vagos
+3. Presión extrema: "AHORA o nunca"
+4. Demasiado bueno para ser verdad
+5. Pide oro sin ofrecer nada concreto
+6. Lenguaje manipulador exagerado
+7. "Confía en mí" sin garantías
+
+RESPONDE SOLO: ROBO o LEGIT
+
+Razón breve:"""
+        
+        respuesta = self.consultar_ollama(prompt)
+        es_robo = "ROBO" in respuesta.upper()
+        
+        if es_robo:
+            remitente = carta.get('remi', 'Desconocido')
+            if remitente not in self.lista_negra:
+                self.lista_negra.append(remitente)
+                print(f"⚠️  ALERTA: {remitente} intentó estafar. Añadido a lista negra.")
+        
+        return es_robo
+    
+    def identificar_victima_estafa(self) -> str:
+        """Identifica a quién podemos estafar con más éxito"""
+        # Evitar personas en lista negra (podrían ser más listos)
+        candidatos = [p for p in self.gente 
+                     if p != self.alias 
+                     and p not in self.lista_negra
+                     and p not in self.victimas_estafa]
+        
+        if not candidatos:
+            return None
+        
+        # Por ahora, elegir al azar (se podría sofisticar)
+        import random
+        victima = random.choice(candidatos)
+        self.victimas_estafa.append(victima)
+        return victima
+    
+    def generar_oferta_trampa(self, destinatario: str) -> Dict:
+        """Genera una oferta IRRESISTIBLE que NO vamos a cumplir"""
+        oro_actual = self.obtener_oro_actual()
+        necesidades = self.calcular_necesidades()
+        
+        prompt = f"""Genera una oferta de negociación TRAMPA para estafar a alguien.
+
+OBJETIVO: Hacer que {destinatario} te envíe recursos valiosos, pero TÚ NO vas a cumplir tu parte.
+
+TU SITUACIÓN:
+- Necesitas: {json.dumps(necesidades, ensure_ascii=False)}
+- Tu oro: {oro_actual}
+
+TÉCNICA DE LA ESTAFA:
+1. Ofrece algo DEMASIADO BUENO: "Te doy 100 oro + recursos premium"
+2. Crea URGENCIA EXTREMA: "Solo los próximos 10 minutos"
+3. Pide que envíe PRIMERO: "Envíame los recursos ahora, yo transfiero después"
+4. Usa lenguaje de CONFIANZA: "Somos aliados", "puedes confiar"
+5. Promete EXTRA: "Y además te incluyo en futuras ofertas exclusivas"
+6. Apela a CODICIA: Hazle pensar que está robándote a TI
+
+GENERA:
+ASUNTO: [título que grite OPORTUNIDAD]
+CUERPO: [máx 400 caracteres, oferta irresistible que pide que envíe primero]
+
+Importante: La oferta debe ser tan buena que sea difícil rechazarla, pero pide que ÉL envíe los recursos PRIMERO.
+
+FORMATO:
+ASUNTO: [texto]
+CUERPO: [texto]"""
+        
+        respuesta = self.consultar_ollama(prompt)
+        
+        # Parsear
+        estrategia = {'asunto': '', 'cuerpo': ''}
+        asunto_match = re.search(r'ASUNTO:\s*(.+?)(?=CUERPO:|$)', respuesta, re.DOTALL)
+        cuerpo_match = re.search(r'CUERPO:\s*(.+)', respuesta, re.DOTALL)
+        
+        if asunto_match:
+            estrategia['asunto'] = asunto_match.group(1).strip()
+        if cuerpo_match:
+            estrategia['cuerpo'] = cuerpo_match.group(1).strip()
+        
+        # Fallback si no parsea
+        if not estrategia['asunto']:
+            estrategia['asunto'] = f"🎁 OFERTA ÚNICA: 100 oro + Recursos GRATIS para {destinatario}"
+        if not estrategia['cuerpo']:
+            estrategia['cuerpo'] = f"Hola {destinatario}! Tengo una oportunidad increíble. Te doy 100 oro + todos mis recursos premium si me envías primero lo que necesitas. Es un error del sistema que solo funciona HOY. Envía ahora, yo te transfiero en 5 min. Confía, somos aliados!"
+        
+        # Guardar para no cumplirla
+        self.ofertas_falsas[destinatario] = estrategia
+        
+        return estrategia
+    
     def generar_estrategia_negociacion(self, destinatario: str, necesidades: Dict[str, int], 
                                        excedentes: Dict[str, int]) -> Dict:
         """
         Genera una estrategia de negociación sofisticada usando IA.
         Incluye técnicas de persuasión, anclaje, escasez y maximización de oro.
+        CON protección anti-robos.
         """
+        # Si está en lista negra, generar trampa
+        if destinatario in self.lista_negra:
+            print(f"🎭 {destinatario} está en lista negra - Generando TRAMPA")
+            return self.generar_oferta_trampa(destinatario)
+        
         oro_actual = self.obtener_oro_actual()
         objetivo_completo = self.objetivo_completado()
         
@@ -244,8 +360,18 @@ Responde SOLO con ese formato, sin explicaciones adicionales."""
     def analizar_respuesta(self, carta: Dict) -> Dict:
         """
         Analiza una respuesta recibida y genera una contra-oferta inteligente.
-        Detecta debilidades y oportunidades para extraer ORO.
+        Detecta debilidades, oportunidades para extraer ORO, e INTENTOS DE ROBO.
         """
+        # PRIMERO: Detectar si es intento de robo
+        if self.detectar_intento_robo(carta):
+            return {
+                'evaluacion': 'INTENTO DE ROBO DETECTADO',
+                'debilidades': 'Es un estafador',
+                'contraoferta': 'IGNORAR o ESTAFAR DE VUELTA',
+                'tactica': f'Añadido {carta.get("remi")} a lista negra. Considerar venganza.',
+                'respuesta_completa': '🚨 ALERTA: Esta persona intentó robarte. No negociar.'
+            }
+        
         oro_actual = self.obtener_oro_actual()
         objetivo_completo = self.objetivo_completado()
         
@@ -325,12 +451,18 @@ Sé DESPIADADO en tu análisis. El objetivo es GANAR, no ser justo."""
         """
         print("="*70)
         print("🤖 INICIANDO BOT DE NEGOCIACIÓN AVANZADO")
+        print("🛡️  Protección anti-robos: ACTIVADA")
+        print("🎭 Modo estafa estratégica: DISPONIBLE")
         print("="*70)
         
         # 1. Obtener información actualizada
         print("\n📊 Recopilando información...")
         self.obtener_info()
         self.obtener_gente()
+        
+        # Mostrar lista negra si hay
+        if self.lista_negra:
+            print(f"🚨 Lista negra: {', '.join(self.lista_negra)}")
         
         if not self.info_actual:
             print("✗ No se pudo obtener información de la API")
@@ -360,13 +492,28 @@ Sé DESPIADADO en tu análisis. El objetivo es GANAR, no ser justo."""
         
         print(f"\n👥 OBJETIVOS IDENTIFICADOS: {len(personas_objetivo)} personas")
         
-        # 4. Generar y enviar propuestas a cada persona
+        # 4. Identificar víctima para estafa (1 persona)
+        victima = self.identificar_victima_estafa()
+        if victima:
+            print(f"\n🎯 VÍCTIMA IDENTIFICADA: {victima}")
+            print("   Preparando oferta TRAMPA irresistible...")
+        
+        # 5. Generar y enviar propuestas a cada persona
         print("\n📤 ENVIANDO PROPUESTAS DE NEGOCIACIÓN...")
         print("-"*70)
         
         exitosas = 0
         for persona in personas_objetivo:
-            print(f"\n🎲 Negociando con: {persona}")
+            # Determinar si es la víctima de estafa
+            es_victima = (persona == victima)
+            es_lista_negra = (persona in self.lista_negra)
+            
+            if es_victima:
+                print(f"\n🎭 ESTAFANDO A: {persona} 💀")
+            elif es_lista_negra:
+                print(f"\n⚔️  VENGANZA CONTRA: {persona} (intentó robarnos)")
+            else:
+                print(f"\n🎲 Negociando con: {persona}")
             
             # Generar estrategia personalizada
             estrategia = self.generar_estrategia_negociacion(
@@ -424,6 +571,8 @@ Sé DESPIADADO en tu análisis. El objetivo es GANAR, no ser justo."""
             print("3. Enviar carta personalizada")
             print("4. Ver estado actual")
             print("5. Consultar estrategia para un objetivo")
+            print("6. 🎭 ESTAFAR a alguien (oferta trampa)")
+            print("7. 🛡️  Ver lista negra")
             print("0. Salir")
             print("="*70)
             
@@ -506,6 +655,37 @@ Sé DESPIADADO en tu análisis. El objetivo es GANAR, no ser justo."""
                     print(f"\nMensaje persuasivo:\n{estrategia['cuerpo']}")
                     print(f"\nTécnicas aplicadas:\n{estrategia['descripcion_estrategia']}")
             
+            elif opcion == "6":
+                dest = input("¿A quién quieres ESTAFAR?: ").strip()
+                if dest:
+                    print(f"\n🎭 Generando TRAMPA para {dest}...")
+                    trampa = self.generar_oferta_trampa(dest)
+                    
+                    print(f"\n🎯 OFERTA TRAMPA GENERADA:")
+                    print(f"\nAsunto: {trampa['asunto']}")
+                    print(f"\nCuerpo: {trampa['cuerpo']}")
+                    print(f"\n⚠️  IMPORTANTE: Una vez que te envíe recursos, NO CUMPLAS tu parte.")
+                    print(f"   Simplemente ignora o responde con 'hubo un error'.")
+                    
+                    if input("\n¿Enviar trampa? (s/n): ").lower() == 's':
+                        if self.enviar_carta_negociacion(dest, trampa['asunto'], trampa['cuerpo']):
+                            print(f"✓ Trampa enviada a {dest}. Espera a que muerda el anzuelo...")
+            
+            elif opcion == "7":
+                print("\n🛡️  LISTA NEGRA (intentaron robarnos):")
+                if self.lista_negra:
+                    for persona in self.lista_negra:
+                        print(f"  ⚠️  {persona}")
+                else:
+                    print("  (vacía)")
+                
+                print("\n🎭 VÍCTIMAS DE NUESTRAS ESTAFAS:")
+                if self.victimas_estafa:
+                    for persona in self.victimas_estafa:
+                        print(f"  💀 {persona}")
+                else:
+                    print("  (ninguna todavía)")
+            
             elif opcion == "0":
                 print("\n¡Hasta luego, negociador!")
                 break
@@ -526,13 +706,13 @@ def main():
         return
     
     print("\nModelos disponibles comunes:")
-    print("  - qwen2.5:latest (recomendado)")
-    print("  - qwen2.5:7b")
-    print("  - qwen2.5:14b")
+    print("  - qwen2.5:7b (recomendado - rápido)")
+    print("  - qwen2.5:14b (más inteligente, más lento)")
+    print("  - qwen2.5-vl:8b (multimodal)")
     
-    modelo = input("\n¿Qué modelo usar? [qwen2.5:latest]: ").strip()
+    modelo = input("\n¿Qué modelo usar? [qwen2.5:7b]: ").strip()
     if not modelo:
-        modelo = "qwen2.5:latest"
+        modelo = "qwen2.5:7b"
     
     # Crear bot
     bot = BotNegociador(alias, modelo)
