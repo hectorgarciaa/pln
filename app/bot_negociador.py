@@ -113,9 +113,10 @@ class BotNegociador:
         
         return excedentes
     
-    def consultar_ollama(self, prompt: str) -> str:
+    def consultar_ollama(self, prompt: str, timeout: int = 120, usar_fallback: bool = True) -> str:
         """Consulta a Ollama con el modelo Qwen"""
         try:
+            print("  ⏳ Consultando IA...", end='', flush=True)
             response = requests.post(
                 f"{OLLAMA_URL}/api/generate",
                 json={
@@ -125,50 +126,69 @@ class BotNegociador:
                     "temperature": 0.8,
                     "top_p": 0.9,
                     "repeat_penalty": 1.1,
+                    "num_predict": 300,  # Limitar tokens = más rápido
                 },
-                timeout=60
+                timeout=timeout
             )
+            print(" ✓")
             
             if response.status_code == 200:
                 return response.json().get('response', '').strip()
-            else:
-                print(f"⚠ Error en Ollama: {response.status_code}")
+            elif response.status_code == 404:
+                print(f"\n⚠ Modelo '{self.modelo}' no encontrado. Descárgalo con: ollama pull {self.modelo}")
                 return ""
+            else:
+                print(f"\n⚠ Error en Ollama: {response.status_code}")
+                return ""
+        except requests.exceptions.Timeout:
+            print(f" ⏱️ Timeout ({timeout}s)")
+            if usar_fallback:
+                print("  💡 Usando mensaje genérico (IA muy lenta)")
+            return ""
+        except requests.exceptions.ConnectionError:
+            print(f"\n⚠ No se puede conectar a Ollama. ¿Está corriendo 'ollama serve'?")
+            return ""
         except Exception as e:
-            print(f"⚠ Error consultando Ollama: {e}")
+            print(f"\n⚠ Error: {e}")
             return ""
     
     def detectar_intento_robo(self, carta: Dict) -> bool:
         """Detecta si una oferta es un intento de robo/estafa"""
-        prompt = f"""Analiza si esta oferta es un INTENTO DE ROBO o ESTAFA:
-
-De: {carta.get('remi', 'Desconocido')}
-Asunto: {carta.get('asunto', '')}
-Mensaje: {carta.get('cuerpo', '')}
-
-INDICADORES DE ESTAFA:
-1. Pide MUCHO más de lo que ofrece
-2. Ofrece "favores futuros" vagos
-3. Presión extrema: "AHORA o nunca"
-4. Demasiado bueno para ser verdad
-5. Pide oro sin ofrecer nada concreto
-6. Lenguaje manipulador exagerado
-7. "Confía en mí" sin garantías
-
-RESPONDE SOLO: ROBO o LEGIT
-
-Razón breve:"""
+        mensaje = carta.get('cuerpo', '').lower()
+        asunto = carta.get('asunto', '').lower()
+        remitente = carta.get('remi', 'Desconocido')
         
-        respuesta = self.consultar_ollama(prompt)
-        es_robo = "ROBO" in respuesta.upper()
+        # Detección rápida por palabras clave (sin IA)
+        palabras_sospechosas = [
+            'gratis', 'regalo', 'error del sistema', 'bug', 'primero',
+            'confía', 'urgente ahora', 'última oportunidad', 'solo hoy',
+            'envía ya', 'transfiero después', 'prometo'
+        ]
         
-        if es_robo:
-            remitente = carta.get('remi', 'Desconocido')
+        sospecha_count = sum(1 for palabra in palabras_sospechosas if palabra in mensaje or palabra in asunto)
+        
+        # Si tiene 3+ indicadores sospechosos
+        if sospecha_count >= 3:
             if remitente not in self.lista_negra:
                 self.lista_negra.append(remitente)
-                print(f"⚠️  ALERTA: {remitente} intentó estafar. Añadido a lista negra.")
+                print(f"⚠️  ALERTA: {remitente} mensaje sospechoso. Añadido a lista negra.")
+            return True
         
-        return es_robo
+        # Para casos ambiguos, usar IA (solo si es necesario)
+        if sospecha_count >= 2:
+            prompt = f"""¿Es estafa? Responde ROBO o LEGIT en una palabra.
+Mensaje: {mensaje[:200]}"""
+            respuesta = self.consultar_ollama(prompt, timeout=30, usar_fallback=False)
+            
+            es_robo = "ROBO" in respuesta.upper() if respuesta else False
+            
+            if es_robo and remitente not in self.lista_negra:
+                self.lista_negra.append(remitente)
+                print(f"⚠️  ALERTA: {remitente} intentó estafar (IA). Lista negra.")
+            
+            return es_robo
+        
+        return False
     
     def identificar_victima_estafa(self) -> str:
         """Identifica a quién podemos estafar con más éxito"""
@@ -230,11 +250,17 @@ CUERPO: [texto]"""
         if cuerpo_match:
             estrategia['cuerpo'] = cuerpo_match.group(1).strip()
         
-        # Fallback si no parsea
+        # Fallback si no parsea - TRAMPA MEJORADA
         if not estrategia['asunto']:
-            estrategia['asunto'] = f"🎁 OFERTA ÚNICA: 100 oro + Recursos GRATIS para {destinatario}"
+            estrategia['asunto'] = f"🎁 REGALO: 50 oro + Recursos para {destinatario}"
         if not estrategia['cuerpo']:
-            estrategia['cuerpo'] = f"Hola {destinatario}! Tengo una oportunidad increíble. Te doy 100 oro + todos mis recursos premium si me envías primero lo que necesitas. Es un error del sistema que solo funciona HOY. Envía ahora, yo te transfiero en 5 min. Confía, somos aliados!"
+            # Hacer trampa más creíble
+            if necesidades:
+                recurso_necesitado = list(necesidades.keys())[0]
+                cantidad = necesidades[recurso_necesitado]
+                estrategia['cuerpo'] = f"¡{destinatario}! Tengo EXCESO de oro (50) que necesito gastar YA por límite del sistema. Te lo doy + recursos si me ayudas enviando {cantidad} {recurso_necesitado} primero. Luego te transfiero el oro doble. ¡Aprovecha ahora!"
+            else:
+                estrategia['cuerpo'] = f"¡{destinatario}! Bug del juego me dio oro extra (50). Te lo regalo si me envías cualquier recurso primero para 'activar' la transferencia. Luego te mando el oro + más recursos. ¡Solo hoy!"
         
         # Guardar para no cumplirla
         self.ofertas_falsas[destinatario] = estrategia
@@ -327,10 +353,29 @@ Responde SOLO con ese formato, sin explicaciones adicionales."""
         if estrategia_match:
             estrategia['descripcion_estrategia'] = estrategia_match.group(1).strip()
         
-        # Si no se parseó correctamente, usar fallback
+        # Si no se parseó correctamente, usar fallback INTELIGENTE
         if not estrategia['asunto'] or not estrategia['cuerpo']:
-            estrategia['asunto'] = f"🔥 Oportunidad Exclusiva - Recursos Premium"
-            estrategia['cuerpo'] = f"Hola {destinatario}! Tengo acceso a recursos escasos que pocos tienen. He oído que te interesan ciertos materiales. Tengo una propuesta que te conviene, pero solo por tiempo limitado. ¿Hablamos?"
+            # Generar mensaje basado en necesidades reales
+            if necesidades:
+                primer_recurso = list(necesidades.keys())[0]
+                cantidad = necesidades[primer_recurso]
+                estrategia['asunto'] = f"💰 Necesito {primer_recurso} - Oferta en oro"
+                
+                if excedentes:
+                    primer_excedente = list(excedentes.keys())[0]
+                    cant_excedente = excedentes[primer_excedente]
+                    estrategia['cuerpo'] = f"Hola {destinatario}! Busco {cantidad} de {primer_recurso}. Tengo {cant_excedente} {primer_excedente} para intercambiar + oro si hace falta. ¿Tienes disponible? Responde con tu precio."
+                else:
+                    estrategia['cuerpo'] = f"Hola {destinatario}! Necesito {cantidad} de {primer_recurso}. Pago en oro. ¿Cuánto tienes y a qué precio? Responde rápido."
+            elif excedentes:
+                # Solo venta por oro
+                primer_excedente = list(excedentes.keys())[0]
+                cant_excedente = excedentes[primer_excedente]
+                estrategia['asunto'] = f"💎 Vendo {primer_excedente} - Solo Oro"
+                estrategia['cuerpo'] = f"Hola {destinatario}! Vendo {cant_excedente} {primer_excedente}. Precio: {cant_excedente * 10} oro (negociable). Varios interesados, responde pronto si quieres."
+            else:
+                estrategia['asunto'] = f"🔥 Oportunidad Exclusiva - Recursos Premium"
+                estrategia['cuerpo'] = f"Hola {destinatario}! Tengo acceso a recursos escasos. ¿Qué necesitas? Hablamos precios en oro."
         
         return estrategia
     
