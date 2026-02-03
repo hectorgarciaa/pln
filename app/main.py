@@ -68,10 +68,22 @@ def get_user_info():
             print(f"{i}. {usuario}")
         
         # Pedimos al usuario que seleccione
-        usuario = input("\nIntroduce el nombre del usuario: ").strip()
-        if not usuario:
-            print("✗ El nombre de usuario no puede estar vacío")
+        seleccion = input("\nIntroduce el número o nombre del usuario: ").strip()
+        if not seleccion:
+            print("✗ La selección no puede estar vacía")
             return
+        
+        # Intentar interpretar como número primero
+        try:
+            num = int(seleccion)
+            if 1 <= num <= len(usuarios):
+                usuario = usuarios[num - 1]
+            else:
+                print(f"✗ Número fuera de rango. Debe ser entre 1 y {len(usuarios)}")
+                return
+        except ValueError:
+            # Si no es un número, usar como nombre directamente
+            usuario = seleccion
         
         # Intentamos obtener información del usuario
         url = f"{BASE_URL}/info/{usuario}"
@@ -137,10 +149,22 @@ def robar_materiales():
             print(f"{i}. {usuario}")
         
         # Pedimos al usuario que seleccione
-        victima = input("\nIntroduce el nombre del usuario a robar: ").strip()
-        if not victima:
-            print("✗ El nombre de usuario no puede estar vacío")
+        seleccion = input("\nIntroduce el número o nombre del usuario a robar: ").strip()
+        if not seleccion:
+            print("✗ La selección no puede estar vacía")
             return
+        
+        # Intentar interpretar como número primero
+        try:
+            num = int(seleccion)
+            if 1 <= num <= len(usuarios):
+                victima = usuarios[num - 1]
+            else:
+                print(f"✗ Número fuera de rango. Debe ser entre 1 y {len(usuarios)}")
+                return
+        except ValueError:
+            # Si no es un número, usar como nombre directamente
+            victima = seleccion
         
         # Obtenemos información del usuario objetivo
         url_info = f"{BASE_URL}/info/{victima}"
