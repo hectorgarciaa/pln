@@ -126,7 +126,7 @@ class BotNegociador:
                     "temperature": 0.8,
                     "top_p": 0.9,
                     "repeat_penalty": 1.1,
-                    "num_predict": 300,  # Limitar tokens = más rápido
+                    "num_predict": 200,  # Respuestas cortas = más rápido
                 },
                 timeout=timeout
             )
@@ -212,31 +212,15 @@ Mensaje: {mensaje[:200]}"""
         oro_actual = self.obtener_oro_actual()
         necesidades = self.calcular_necesidades()
         
-        prompt = f"""Genera una oferta de negociación TRAMPA para estafar a alguien.
+        prompt = f"""TRAMPA para {destinatario}.
 
-OBJETIVO: Hacer que {destinatario} te envíe recursos valiosos, pero TÚ NO vas a cumplir tu parte.
+Ofrece: 50 oro + recursos
+Pide: Que envíe PRIMERO
+Urgencia: Solo hoy
 
-TU SITUACIÓN:
-- Necesitas: {json.dumps(necesidades, ensure_ascii=False)}
-- Tu oro: {oro_actual}
-
-TÉCNICA DE LA ESTAFA:
-1. Ofrece algo DEMASIADO BUENO: "Te doy 100 oro + recursos premium"
-2. Crea URGENCIA EXTREMA: "Solo los próximos 10 minutos"
-3. Pide que envíe PRIMERO: "Envíame los recursos ahora, yo transfiero después"
-4. Usa lenguaje de CONFIANZA: "Somos aliados", "puedes confiar"
-5. Promete EXTRA: "Y además te incluyo en futuras ofertas exclusivas"
-6. Apela a CODICIA: Hazle pensar que está robándote a TI
-
-GENERA:
-ASUNTO: [título que grite OPORTUNIDAD]
-CUERPO: [máx 400 caracteres, oferta irresistible que pide que envíe primero]
-
-Importante: La oferta debe ser tan buena que sea difícil rechazarla, pero pide que ÉL envíe los recursos PRIMERO.
-
-FORMATO:
-ASUNTO: [texto]
-CUERPO: [texto]"""
+Genera (max 150 chars):
+ASUNTO: [gancho]
+CUERPO: [oferta irresistible + "envía primero"]"""
         
         respuesta = self.consultar_ollama(prompt)
         
@@ -279,59 +263,28 @@ CUERPO: [texto]"""
             print(f"🎭 {destinatario} está en lista negra - Generando TRAMPA")
             return self.generar_oferta_trampa(destinatario)
         
-        oro_actual = self.obtener_oro_actual()
-        objetivo_completo = self.objetivo_completado()
-        
         # Si ya completamos el objetivo, el foco es 100% acumular oro
         if objetivo_completo:
-            enfoque = "ACUMULAR ORO - El objetivo está completo, ahora solo importa MAXIMIZAR ORO"
+            enfoque = "VENDER POR ORO"
         else:
-            enfoque = "CONSEGUIR RECURSOS minimizando gasto de oro y preferiblemente GANANDO oro en el intercambio"
+            enfoque = "CONSEGUIR recursos, pedir ORO"
         
-        prompt = f"""Eres un maestro negociador DESPIADADO. Tu objetivo es MAXIMIZAR ORO mientras consigues lo que necesitas.
+        prompt = f"""Negociador experto. Objetivo: {enfoque}
 
-🎯 OBJETIVO PRINCIPAL: {enfoque}
+Tú: {self.alias}, Oro: {oro_actual}
+Destinatario: {destinatario}
+Necesitas: {json.dumps(necesidades, ensure_ascii=False)}
+Tienes: {json.dumps(excedentes, ensure_ascii=False)}
 
-CONTEXTO DE LA NEGOCIACIÓN:
-- Tu nombre: {self.alias}
-- Destinatario: {destinatario}
-- Tu oro actual: {oro_actual} 💰
-- Recursos que NECESITAS: {json.dumps(necesidades, ensure_ascii=False)}
-- Recursos que PODRÍAS ofrecer: {json.dumps(excedentes, ensure_ascii=False)}
-- ¿Objetivo completado?: {'SÍ - Solo importa el ORO ahora' if objetivo_completo else 'NO - Necesitas recursos pero sin perder oro'}
+Genera carta (max 200 chars):
+- Pide ORO siempre
+- Crea urgencia
+- Usa escasez
 
-TÉCNICAS DE NEGOCIACIÓN A APLICAR:
-
-1. **MAXIMIZACIÓN DE ORO**: SIEMPRE intenta que te paguen ORO, o que TÚ pagues menos oro del que recibes
-2. **ANCLAJE DE VALOR**: Infla el valor de tus recursos, minimiza el valor de los suyos
-3. **EXTRACCIÓN DE ORO**: Si ofreces algo, EXIGE oro además del intercambio de recursos
-4. **ESCASEZ**: Haz creer que tus recursos son limitados y valiosos
-5. **RECIPROCIDAD**: Crea deuda social para después cobrar en ORO
-6. **AUTORIDAD**: Insinúa que "el precio de mercado" de tus recursos es alto
-7. **PRESIÓN SOCIAL**: "Otros me están ofreciendo oro por esto mismo"
-8. **FALSA GENEROSIDAD**: Ofrece un trato "sin oro" pero pide MÁS recursos de alto valor
-9. **PUNTO DE DOLOR**: Explota su necesidad para cobrar oro o pagar menos
-10. **FOMO**: "Esta es la última vez que acepto un trato sin oro adicional"
-
-GENERA UNA CARTA DE NEGOCIACIÓN que incluya:
-1. Un ASUNTO atractivo que insinúe beneficio económico
-2. Un CUERPO persuasivo (max 500 caracteres) que:
-   - Use un tono comercial astuto
-   - SIEMPRE mencione oro como parte del intercambio (pedir oro o ahorrar oro)
-   - Haga parecer que tus recursos valen ORO
-   - Insinúe que tienes otros compradores dispuestos a pagar oro
-   - Si ya completaste objetivo: enfócate 100% en vender por oro
-   - Si no: consigue recursos pero intenta GANAR oro neto en el trato
-   - Cree urgencia económica: "el oro escasea", "los precios suben"
-   - Haga que rechazar se sienta como perder dinero
-
-FORMATO DE RESPUESTA (en una sola línea, sin saltos):
-ASUNTO: [asunto persuasivo]
-CUERPO: [mensaje manipulador estratégico]
-ESTRATEGIA: [técnicas usadas]
-
-Responde SOLO con ese formato, sin explicaciones adicionales."""
-
+FORMATO:
+ASUNTO: [título]
+CUERPO: [mensaje corto]"""
+        
         respuesta = self.consultar_ollama(prompt)
         
         # Parsear la respuesta
@@ -420,35 +373,18 @@ Responde SOLO con ese formato, sin explicaciones adicionales."""
         oro_actual = self.obtener_oro_actual()
         objetivo_completo = self.objetivo_completado()
         
-        prompt = f"""Eres un negociador experto analizando una respuesta. Tu objetivo: MAXIMIZAR ORO.
+        prompt = f"""Analiza oferta. Objetivo: MAX ORO
 
-TU SITUACIÓN:
-- Oro actual: {oro_actual} 💰
-- Objetivo completo: {'SÍ (solo importa oro)' if objetivo_completo else 'NO (necesitas recursos + oro)'}
+Oro actual: {oro_actual}
+De: {carta.get('remi')}
+Mensaje: {carta.get('cuerpo')[:150]}
 
-CARTA RECIBIDA:
-- De: {carta.get('remi', 'Desconocido')}
-- Asunto: {carta.get('asunto', '')}
-- Mensaje: {carta.get('cuerpo', '')}
+¿Desesperado? ¿Cuánto oro cobrar?
 
-ANALIZA CON ENFOQUE EN ORO:
-1. ¿Muestra desesperación? ¿Puedes cobrarle ORO por lo que necesita?
-2. ¿Qué recursos menciona? ¿Cuál es su valor en ORO?
-3. ¿Mencionó oro? Si no, ¿cómo introducirlo en la negociación?
-4. ¿Está dispuesto a pagar? ¿Cuánto ORO puedes extraer?
-5. ¿Qué contra-oferta te da MÁS oro (directa o indirectamente)?
-
-GENERA:
-EVALUACION: [nivel de desesperación: Alto/Medio/Bajo]
-DEBILIDADES: [puntos débiles para explotar]
-POTENCIAL_ORO: [cuánto oro podrías ganar/ahorrar]
-CONTRAOFERTA: [propuesta que maximice tu oro]
-TACTICA: [cómo hacer que acepte pagar oro]
-
-Sé DESPIADADO en tu análisis. El objetivo es GANAR, no ser justo."""
-
-        respuesta = self.consultar_ollama(prompt)
-        
+Respuesta corta:
+EVALUACION: [Alto/Medio/Bajo]
+ORO: [cantidad a cobrar]
+TACTICA: [cómo presionar]"""
         analisis = {
             'evaluacion': '',
             'debilidades': '',
