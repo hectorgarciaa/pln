@@ -110,8 +110,8 @@ class BotNegociador:
         
         return excedentes
     
-    def consultar_ollama(self, prompt: str, timeout: int = 120, usar_fallback: bool = True) -> str:
-        """Consulta a Ollama con el modelo Qwen"""
+    def consultar_ollama(self, prompt: str, timeout: int = 60, usar_fallback: bool = True) -> str:
+        """Consulta a Ollama con el modelo Qwen - OPTIMIZADO PARA VELOCIDAD"""
         try:
             print("  ⏳ Consultando IA...", end='', flush=True)
             response = requests.post(
@@ -120,10 +120,14 @@ class BotNegociador:
                     "model": self.modelo,
                     "prompt": prompt,
                     "stream": False,
-                    "temperature": 0.8,
-                    "top_p": 0.9,
-                    "repeat_penalty": 1.1,
-                    "num_predict": 200,  # Respuestas cortas = más rápido
+                    # PARÁMETROS OPTIMIZADOS PARA VELOCIDAD:
+                    "temperature": 0.3,        # Más bajo = más rápido y determinista (0.1-0.5)
+                    "top_p": 0.7,             # Más bajo = respuestas más enfocadas
+                    "top_k": 20,              # Limita opciones de tokens
+                    "repeat_penalty": 1.2,    # Evita repeticiones
+                    "num_predict": 150,       # Máximo 150 tokens (respuestas cortas)
+                    "num_ctx": 1024,          # Contexto reducido = más rápido
+                    "stop": ["\n\n", "---"],  # Para en saltos de línea dobles
                 },
                 timeout=timeout
             )
