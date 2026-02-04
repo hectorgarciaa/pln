@@ -476,8 +476,8 @@ TACTICA: [cómo responder]"""
             print("2. Revisar buzón y analizar respuestas")
             print("3. Enviar carta personalizada")
             print("4. Ver estado actual")
-            print("5. Consultar estrategia para un objetivo")
-            print("6. 🛡️  Ver lista negra")
+            print("5. 🛡️  Ver lista negra")
+            print(f"6. ⚡ Cambiar modelo (actual: {self.modelo})")
             print("0. Salir")
             print("="*70)
             
@@ -545,28 +545,46 @@ TACTICA: [cómo responder]"""
                     print(json.dumps(self.info_actual, indent=2, ensure_ascii=False))
             
             elif opcion == "5":
-                dest = input("¿Objetivo de negociación?: ").strip()
-                if dest:
-                    self.obtener_info()
-                    necesidades = self.calcular_necesidades()
-                    excedentes = self.identificar_excedentes()
-                    
-                    estrategia = self.generar_estrategia_negociacion(
-                        dest, necesidades, excedentes
-                    )
-                    
-                    print(f"\n🎯 ESTRATEGIA PARA {dest}:")
-                    print(f"\nAsunto sugerido:\n{estrategia['asunto']}")
-                    print(f"\nMensaje persuasivo:\n{estrategia['cuerpo']}")
-                    print(f"\nTécnicas aplicadas:\n{estrategia['descripcion_estrategia']}")
-            
-            elif opcion == "6":
                 print("\n🛡️  LISTA NEGRA (intentaron robarnos):")
                 if self.lista_negra:
                     for persona in self.lista_negra:
                         print(f"  ⚠️  {persona}")
                 else:
                     print("  (vacía - nadie ha intentado robar)")
+            
+            elif opcion == "6":
+                print("\n⚡ CAMBIAR MODELO")
+                print("="*50)
+                print(f"Modelo actual: {self.modelo}")
+                print("\nModelos disponibles:")
+                print("1. llama3.2:3b       [⚡⚡⚡ ULTRA RÁPIDO - 3-5s]")
+                print("2. qwen3-vl:8b       [⚡⚡  Balance - 5-10s]")
+                print("3. qwen2.5:7b        [⚡   Calidad - 10-15s]")
+                print("4. phi3:mini         [⚡⚡⚡ Muy rápido - 3-5s]")
+                print("5. Personalizado     [Escribe el nombre]")
+                print("="*50)
+                
+                modelo_opcion = input("Selecciona modelo (1-5): ").strip()
+                
+                modelos = {
+                    "1": "llama3.2:3b",
+                    "2": "qwen3-vl:8b",
+                    "3": "qwen2.5:7b",
+                    "4": "phi3:mini"
+                }
+                
+                if modelo_opcion in modelos:
+                    modelo_anterior = self.modelo
+                    self.modelo = modelos[modelo_opcion]
+                    print(f"\n✓ Modelo cambiado: {modelo_anterior} → {self.modelo}")
+                    print(f"💡 Tip: Asegúrate de tener el modelo descargado: ollama pull {self.modelo}")
+                elif modelo_opcion == "5":
+                    modelo_custom = input("Nombre del modelo: ").strip()
+                    if modelo_custom:
+                        self.modelo = modelo_custom
+                        print(f"\n✓ Modelo cambiado a: {self.modelo}")
+                else:
+                    print("\n✗ Opción inválida")
             
             elif opcion == "0":
                 print("\n¡Hasta luego, negociador!")
