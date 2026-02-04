@@ -1,388 +1,304 @@
-import requests
+"""
+Interfaz de usuario (menú interactivo).
+Punto de entrada principal del programa.
+"""
+
 import json
-from bot_negociador import BotNegociador
+from negociador import BotNegociador
+from api_client import APIClient
+from config import MODELOS_DISPONIBLES
 
-BASE_URL = "http://147.96.81.252:7719"
 
-def mostrar_menu():
-    """Muestra el menú principal con todas las opciones disponibles"""
-    print("\n" + "="*60)
-    print("API - MENÚ PRINCIPAL")
-    print("="*60)
-    print("1. GET /info - Obtener información general")
-    print("2. GET /gente - Obtener lista de personas")
-    print("3. POST /alias/{nombre} - Añadir un alias")
-    print("4. DELETE /alias/{nombre} - Eliminar un alias")
-    print("5. POST /carta - Enviar una carta")
-    print("6. POST /paquete - Enviar un paquete")
-    print("7. DELETE /mail/{uid} - Eliminar un mail")
-    print("8. 🤖 BOT NEGOCIADOR - Negociación automática con IA")
-    print("0. Salir")
-    print("="*60)
-
-def get_info():
-    """GET /info - Obtiene información general"""
-    url = f"{BASE_URL}/info"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            print("\n✓ Información obtenida con éxito:")
-            print(json.dumps(data, indent=2, ensure_ascii=False))
-        else:
-            print(f"✗ Error {response.status_code}: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"✗ Error de conexión: {e}")
-
-def get_gente():
-    """GET /gente - Obtiene la lista de personas"""
-    url = f"{BASE_URL}/gente"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            print("\n✓ Lista de personas:")
-            for persona in data:
-                print(f"  - {persona}")
-        else:
-            print(f"✗ Error {response.status_code}: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"✗ Error de conexión: {e}")
-
-def add_alias():
-    """POST /alias/{nombre} - Añade un alias"""
-    nombre = input("Introduce el nombre del alias: ").strip()
-    if not nombre:
-        print("✗ El nombre no puede estar vacío")
+def mostrar_estado(bot: BotNegociador):
+    """Muestra el estado actual del jugador."""
+    bot.actualizar_info()
+    
+    if not bot.info_actual:
+        print("✗ No se pudo obtener información")
         return
     
-    url = f"{BASE_URL}/alias/{nombre}"
-    try:
-        response = requests.post(url)
-        if response.status_code == 200:
-            print(f"✓ Alias '{nombre}' añadido con éxito")
-            print("Respuesta:", response.json())
-        elif response.status_code == 422:
-            print(f"✗ Error de validación (422)")
-            print("Detalle:", response.json())
-        else:
-            print(f"✗ Error {response.status_code}: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"✗ Error de conexión: {e}")
+    necesidades = bot.calcular_necesidades()
+    excedentes = bot.calcular_excedentes()
+    objetivo_ok = bot.objetivo_completado()
+    
+    print("\n📊 ESTADO ACTUAL")
+    print("="*50)
+    print(f"💰 Oro: {bot.get_oro()}")
+    print(f"✅ Objetivo: {'Completado' if objetivo_ok else 'Pendiente'}")
+    print(f"\n🎯 Necesitas: {json.dumps(necesidades, ensure_ascii=False)}")
+    print(f"📦 Excedentes: {json.dumps(excedentes, ensure_ascii=False)}")
+    
+    print(f"\n📋 Recursos completos:")
+    print(json.dumps(bot.get_recursos(), indent=2, ensure_ascii=False))
 
-def delete_alias():
-    """DELETE /alias/{nombre} - Elimina un alias"""
-    nombre = input("Introduce el nombre del alias a eliminar: ").strip()
-    if not nombre:
-        print("✗ El nombre no puede estar vacío")
+
+def revisar_buzon(bot: BotNegociador):
+    """Revisa y analiza el buzón."""
+    cartas = bot.get_cartas_recibidas()
+    
+    if not cartas:
+        print("\n✓ Buzón vacío")
         return
     
-    url = f"{BASE_URL}/alias/{nombre}"
-    try:
-        response = requests.delete(url)
-        if response.status_code == 200:
-            print(f"✓ Alias '{nombre}' eliminado correctamente")
-            print("Respuesta:", response.json())
-        elif response.status_code == 422:
-            print(f"✗ Error de validación (422)")
-            print("Detalle:", response.json())
-        else:
-            print(f"✗ Error {response.status_code}: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"✗ Error de conexión: {e}")
+    print(f"\n📬 {len(cartas)} cartas:")
+    
+    for i, carta in enumerate(cartas, 1):
+        print(f"\n{'─'*50}")
+        print(f"📧 Carta {i}")
+        print(f"  De: {carta.get('remi')}")
+        print(f"  Asunto: {carta.get('asunto')}")
+        print(f"  Mensaje: {carta.get('cuerpo')}")
+        
+        analisis = bot.analizar_respuesta(carta)
+        print(f"\n  🧠 Análisis: {analisis.get('evaluacion', 'N/A')}")
+        print(f"  💡 Táctica: {analisis.get('tactica', 'N/A')}")
 
-def send_carta():
-    """POST /carta - Envía una carta"""
-    print("\n--- Enviar Carta ---")
-    remi = input("Remitente: ").strip()
-    dest = input("Destinatario: ").strip()
-    asunto = input("Asunto: ").strip()
-    cuerpo = input("Cuerpo del mensaje: ").strip()
-    id_carta = input("ID de la carta: ").strip()
-    
-    if not all([remi, dest, asunto, cuerpo, id_carta]):
-        print("✗ Todos los campos son obligatorios")
-        return
-    
-    url = f"{BASE_URL}/carta"
-    carta_data = {
-        "remi": remi,
-        "dest": dest,
-        "asunto": asunto,
-        "cuerpo": cuerpo,
-        "id": id_carta
-    }
-    
-    try:
-        response = requests.post(url, json=carta_data)
-        if response.status_code == 200:
-            print("✓ Carta enviada con éxito")
-            print("Respuesta:", response.json())
-        elif response.status_code == 422:
-            print(f"✗ Error de validación (422)")
-            print("Detalle:", response.json())
-        else:
-            print(f"✗ Error {response.status_code}: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"✗ Error de conexión: {e}")
 
-def send_paquete():
-    """POST /paquete - Envía un paquete"""
-    print("\n--- Enviar Paquete ---")
+def enviar_carta_manual(bot: BotNegociador):
+    """Envía una carta con propuesta generada por IA."""
     dest = input("Destinatario: ").strip()
     if not dest:
-        print("✗ El destinatario es obligatorio")
         return
     
-    print("\nIntroduce los recursos (deja vacío para terminar):")
-    recursos = {}
+    bot.actualizar_info()
+    propuesta = bot.generar_propuesta(dest)
+    
+    print(f"\n📋 PROPUESTA GENERADA:")
+    print(f"  Asunto: {propuesta['asunto']}")
+    print(f"  Cuerpo: {propuesta['cuerpo']}")
+    
+    if input("\n¿Enviar? (s/n): ").lower() == 's':
+        bot.enviar_carta(dest, propuesta['asunto'], propuesta['cuerpo'])
+
+
+def enviar_paquete_manual(bot: BotNegociador):
+    """Envía un paquete de recursos manualmente."""
+    bot.actualizar_info()
+    recursos = bot.get_recursos()
+    
+    print(f"\nTus recursos: {json.dumps(recursos, ensure_ascii=False)}")
+    
+    dest = input("\nDestinatario: ").strip()
+    if not dest:
+        return
+    
+    recursos_enviar = {}
+    print("\nIntroduce recursos (escribe 'fin' para terminar):")
+    
     while True:
-        recurso = input("  Nombre del recurso (o Enter para terminar): ").strip()
-        if not recurso:
+        recurso = input("  Recurso: ").strip().lower()
+        if recurso == 'fin':
             break
-        try:
-            cantidad = int(input(f"  Cantidad de {recurso}: ").strip())
-            recursos[recurso] = cantidad
-        except ValueError:
-            print("  ✗ La cantidad debe ser un número entero")
-    
-    if not recursos:
-        print("✗ Debes especificar al menos un recurso")
-        return
-    
-    url = f"{BASE_URL}/paquete"
-    params = {"dest": dest}
-    
-    try:
-        response = requests.post(url, params=params, json=recursos)
-        if response.status_code == 200:
-            print("✓ Paquete enviado con éxito")
-            print("Respuesta:", response.json())
-        elif response.status_code == 422:
-            print(f"✗ Error de validación (422)")
-            print("Detalle:", response.json())
-        else:
-            print(f"✗ Error {response.status_code}: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"✗ Error de conexión: {e}")
-
-def delete_mail():
-    """DELETE /mail/{uid} - Elimina un mail"""
-    uid = input("Introduce el UID del mail a eliminar: ").strip()
-    if not uid:
-        print("✗ El UID no puede estar vacío")
-        return
-    
-    url = f"{BASE_URL}/mail/{uid}"
-    try:
-        response = requests.delete(url)
-        if response.status_code == 200:
-            print(f"✓ Mail con UID '{uid}' eliminado correctamente")
-            print("Respuesta:", response.json())
-        elif response.status_code == 422:
-            print(f"✗ Error de validación (422)")
-            print("Detalle:", response.json())
-        else:
-            print(f"✗ Error {response.status_code}: {response.text}")
-    except requests.exceptions.RequestException as e:
-        print(f"✗ Error de conexión: {e}")
-
-def ejecutar_bot_negociador():
-    """🤖 Ejecuta el bot negociador con IA (Ollama)"""
-    print("\n" + "="*60)
-    print("🤖 BOT NEGOCIADOR - IA con Ollama")
-    print("="*60)
-    
-    alias = input("Introduce tu alias/nombre: ").strip()
-    if not alias:
-        print("✗ El alias no puede estar vacío")
-        return
-    
-    # Opciones de modelo
-    print("\nModelos disponibles:")
-    print("1. qwen3-vl:8b (Recomendado - Rápido)")
-    print("2. llama3.2:3b (Alternativa - Más rápido aún)")
-    print("3. qwen2.5:7b (Alternativa)")
-    modelo_opcion = input("Selecciona modelo (1-3) [1]: ").strip() or "1"
-    
-    modelos = {
-        "1": "qwen3-vl:8b",
-        "2": "llama3.2:3b",
-        "3": "qwen2.5:7b"
-    }
-    modelo = modelos.get(modelo_opcion, "qwen3-vl:8b")
-    
-    print(f"\n⚙️  Configuración:")
-    print(f"   Alias: {alias}")
-    print(f"   Modelo: {modelo}")
-    print(f"   Optimización: VELOCIDAD (temp=0.3, max_tokens=150)")
-    print("\n💡 Tip: Asegúrate de tener Ollama corriendo ('ollama serve')\n")
-    
-    try:
-        # Crear instancia del bot
-        bot = BotNegociador(alias=alias, modelo=modelo)
+        if recurso not in recursos:
+            print(f"  ⚠️ No tienes {recurso}")
+            continue
         
-        # Menú del bot
-        while True:
-            print("\n" + "-"*60)
-            print("OPCIONES DEL BOT:")
-            print("1. 📊 Ver estado actual")
-            print("2. 🎯 Iniciar negociación automática")
-            print("3. 📬 Revisar buzón y analizar ofertas")
-            print("4. 🔄 Ejecutar ciclo completo (negociar + revisar)")
-            print("0. ⬅️  Volver al menú principal")
-            print("-"*60)
-            
-            opcion_bot = input("Opción: ").strip()
-            
-            if opcion_bot == "1":
-                # Ver estado
-                print("\n📊 Obteniendo información...")
-                info = bot.obtener_info()
-                if info:
-                    print("\n✓ Estado actual:")
-                    print(f"  Recursos: {info.get('Recursos', {})}")
-                    print(f"  Objetivo: {info.get('Objetivo', {})}")
-                    print(f"  Oro: {bot.obtener_oro_actual()}")
-                    necesidades = bot.calcular_necesidades()
-                    print(f"  Necesitas: {necesidades if necesidades else 'Objetivo completo ✓'}")
-                    excedentes = bot.identificar_excedentes()
-                    print(f"  Excedentes: {excedentes if excedentes else 'Ninguno'}")
-            
-            elif opcion_bot == "2":
-                # Negociación automática
-                print("\n🎯 Iniciando negociación...")
-                max_personas = input("¿A cuántas personas contactar? [3]: ").strip() or "3"
-                try:
-                    max_personas = int(max_personas)
-                except ValueError:
-                    max_personas = 3
-                
-                bot.obtener_info()
-                gente = bot.obtener_gente()
-                
-                if not gente:
-                    print("✗ No hay personas disponibles")
-                    continue
-                
-                print(f"\nPersonas disponibles: {len(gente)}")
-                print(f"Contactando a las primeras {min(max_personas, len(gente))}...\n")
-                
-                contactados = 0
-                for persona in gente[:max_personas]:
-                    if persona == alias:
-                        continue
-                    
-                    print(f"\n📤 Negociando con {persona}...")
-                    necesidades = bot.calcular_necesidades()
-                    excedentes = bot.identificar_excedentes()
-                    
-                    estrategia = bot.generar_estrategia_negociacion(
-                        destinatario=persona,
-                        necesidades=necesidades,
-                        excedentes=excedentes
-                    )
-                    
-                    if bot.enviar_carta_negociacion(
-                        destinatario=persona,
-                        asunto=estrategia['asunto'],
-                        cuerpo=estrategia['cuerpo']
-                    ):
-                        contactados += 1
-                        print(f"  💬 Mensaje: {estrategia['cuerpo'][:80]}...")
-                
-                print(f"\n✓ Proceso completo: {contactados} cartas enviadas")
-            
-            elif opcion_bot == "3":
-                # Revisar buzón
-                print("\n📬 Revisando buzón...")
-                bot.obtener_info()
-                buzon = bot.info_actual.get('Buzon', {})
-                
-                if not buzon:
-                    print("✓ Buzón vacío")
-                    continue
-                
-                print(f"\n📨 Tienes {len(buzon)} mensajes:")
-                for uid, carta in buzon.items():
-                    print(f"\n  UID: {uid}")
-                    print(f"  De: {carta.get('remi')}")
-                    print(f"  Asunto: {carta.get('asunto')}")
-                    print(f"  Mensaje: {carta.get('cuerpo')[:100]}...")
-                    
-                    analizar = input("  ¿Analizar con IA? (s/n): ").strip().lower()
-                    if analizar == 's':
-                        analisis = bot.analizar_respuesta(carta)
-                        print(f"\n  🤖 Análisis:")
-                        print(f"     Evaluación: {analisis.get('evaluacion', 'N/A')}")
-                        print(f"     Táctica: {analisis.get('tactica', 'N/A')}")
-            
-            elif opcion_bot == "4":
-                # Ciclo completo
-                print("\n🔄 Ejecutando ciclo completo...\n")
-                print("Paso 1/2: Negociación automática")
-                bot.obtener_info()
-                gente = bot.obtener_gente()
-                
-                for i, persona in enumerate(gente[:3], 1):
-                    if persona == alias:
-                        continue
-                    print(f"  [{i}] Contactando {persona}...")
-                    necesidades = bot.calcular_necesidades()
-                    excedentes = bot.identificar_excedentes()
-                    estrategia = bot.generar_estrategia_negociacion(persona, necesidades, excedentes)
-                    bot.enviar_carta_negociacion(persona, estrategia['asunto'], estrategia['cuerpo'])
-                
-                print("\nPaso 2/2: Revisión de buzón")
-                bot.obtener_info()
-                buzon = bot.info_actual.get('Buzon', {})
-                print(f"  Mensajes en buzón: {len(buzon)}")
-                
-                print("\n✓ Ciclo completo finalizado")
-            
-            elif opcion_bot == "0":
-                print("\n⬅️  Volviendo al menú principal...")
-                break
-            
+        cantidad = input(f"  Cantidad de {recurso}: ").strip()
+        if cantidad.isdigit():
+            cant = int(cantidad)
+            if cant <= recursos.get(recurso, 0):
+                recursos_enviar[recurso] = cant
             else:
-                print("\n✗ Opción no válida")
+                print(f"  ⚠️ Solo tienes {recursos.get(recurso, 0)}")
     
-    except Exception as e:
-        print(f"\n✗ Error ejecutando bot: {e}")
-        import traceback
-        traceback.print_exc()
+    if recursos_enviar:
+        print(f"\n📦 Envío: {recursos_enviar} → {dest}")
+        if input("¿Confirmar? (s/n): ").lower() == 's':
+            bot.enviar_paquete(dest, recursos_enviar)
 
-def main():
-    """Función principal del programa"""
-    print("Bienvenido a la interfaz de la API")
+
+def cambiar_modelo(bot: BotNegociador):
+    """Cambia el modelo de IA."""
+    print(f"\n⚡ CAMBIAR MODELO (actual: {bot.modelo})")
+    print("="*50)
+    
+    for key, (modelo, descripcion) in MODELOS_DISPONIBLES.items():
+        print(f"{key}. {modelo:20} {descripcion}")
+    print("5. Personalizado")
+    
+    opcion = input("\nSelecciona (1-5): ").strip()
+    
+    if opcion in MODELOS_DISPONIBLES:
+        bot.modelo = MODELOS_DISPONIBLES[opcion][0]
+        print(f"✓ Modelo: {bot.modelo}")
+        print(f"💡 Descarga: ollama pull {bot.modelo}")
+    elif opcion == "5":
+        modelo = input("Nombre del modelo: ").strip()
+        if modelo:
+            bot.modelo = modelo
+
+
+def procesar_aceptaciones(bot: BotNegociador):
+    """Procesa aceptaciones y ejecuta intercambios."""
+    acuerdos = bot.procesar_respuestas()
+    
+    if not acuerdos:
+        print("\n❌ No hay aceptaciones pendientes")
+        return
+    
+    print(f"\n🎉 {len(acuerdos)} aceptación(es)")
+    
+    for i, acuerdo in enumerate(acuerdos, 1):
+        print(f"\n--- Acuerdo {i} ---")
+        print(f"De: {acuerdo['remitente']}")
+        print(f"Términos: {acuerdo.get('terminos', {})}")
+        
+        if input(f"\n¿Ejecutar con {acuerdo['remitente']}? (s/n): ").lower() == 's':
+            bot._ejecutar_acuerdo(acuerdo)
+
+
+def menu_bot(alias: str):
+    """Menú principal del bot negociador."""
+    bot = BotNegociador(alias)
     
     while True:
-        mostrar_menu()
-        opcion = input("\nSelecciona una opción: ").strip()
+        print("\n" + "="*60)
+        print("🤖 BOT NEGOCIADOR")
+        print("="*60)
+        print("1. 📊 Ver estado actual")
+        print("2. 🚀 Ejecutar campaña automática")
+        print("3. 📬 Revisar buzón")
+        print("4. ✉️  Enviar carta personalizada")
+        print("5. 📦 Enviar paquete de recursos")
+        print("6. 🔄 Ciclo completo (automático)")
+        print("7. ✅ Procesar aceptaciones")
+        print("8. 🧹 Limpiar buzón")
+        print("9. 🛡️  Ver lista negra")
+        print(f"10. ⚡ Cambiar modelo ({bot.modelo})")
+        print("0. Salir")
+        print("="*60)
+        
+        opcion = input("\nOpción: ").strip()
         
         if opcion == "1":
-            get_info()
+            mostrar_estado(bot)
         elif opcion == "2":
-            get_gente()
+            bot.ejecutar_campana()
         elif opcion == "3":
-            add_alias()
+            revisar_buzon(bot)
         elif opcion == "4":
-            delete_alias()
+            enviar_carta_manual(bot)
         elif opcion == "5":
-            send_carta()
+            enviar_paquete_manual(bot)
         elif opcion == "6":
-            send_paquete()
+            rondas = input("Rondas (default 3): ").strip()
+            rondas = int(rondas) if rondas.isdigit() else 3
+            bot.ciclo_completo(rondas)
         elif opcion == "7":
-            delete_mail()
+            procesar_aceptaciones(bot)
         elif opcion == "8":
-            ejecutar_bot_negociador()
+            mantener = input("Mantener últimas (default 10): ").strip()
+            mantener = int(mantener) if mantener.isdigit() else 10
+            bot.limpiar_buzon(mantener)
+        elif opcion == "9":
+            print("\n🛡️ LISTA NEGRA:")
+            if bot.lista_negra:
+                for p in bot.lista_negra:
+                    print(f"  ⚠️ {p}")
+            else:
+                print("  (vacía)")
+        elif opcion == "10":
+            cambiar_modelo(bot)
         elif opcion == "0":
             print("\n¡Hasta luego!")
             break
-        else:
-            print("\n✗ Opción no válida. Por favor, selecciona una opción del menú.")
+
+
+def menu_api():
+    """Menú para operaciones básicas de la API."""
+    api = APIClient()
+    
+    while True:
+        print("\n" + "="*60)
+        print("📡 OPERACIONES API")
+        print("="*60)
+        print("1. Ver información")
+        print("2. Ver jugadores")
+        print("3. Crear alias")
+        print("4. Eliminar alias")
+        print("5. Enviar carta (manual)")
+        print("6. Enviar paquete (manual)")
+        print("7. Eliminar carta")
+        print("0. Volver")
+        print("="*60)
         
-        input("\nPresiona Enter para continuar...")
+        opcion = input("\nOpción: ").strip()
+        
+        if opcion == "1":
+            info = api.get_info()
+            if info:
+                print(json.dumps(info, indent=2, ensure_ascii=False))
+        
+        elif opcion == "2":
+            gente = api.get_gente()
+            print("\n👥 Jugadores:")
+            for p in gente:
+                print(f"  - {p}")
+        
+        elif opcion == "3":
+            nombre = input("Nombre del alias: ").strip()
+            if nombre:
+                api.crear_alias(nombre)
+        
+        elif opcion == "4":
+            nombre = input("Alias a eliminar: ").strip()
+            if nombre:
+                api.eliminar_alias(nombre)
+        
+        elif opcion == "5":
+            remi = input("Remitente: ").strip()
+            dest = input("Destinatario: ").strip()
+            asunto = input("Asunto: ").strip()
+            cuerpo = input("Cuerpo: ").strip()
+            if all([remi, dest, asunto, cuerpo]):
+                api.enviar_carta(remi, dest, asunto, cuerpo)
+        
+        elif opcion == "6":
+            dest = input("Destinatario: ").strip()
+            recursos = {}
+            print("Recursos (vacío para terminar):")
+            while True:
+                r = input("  Recurso: ").strip()
+                if not r:
+                    break
+                c = input(f"  Cantidad de {r}: ").strip()
+                if c.isdigit():
+                    recursos[r] = int(c)
+            if recursos:
+                api.enviar_paquete(dest, recursos)
+        
+        elif opcion == "7":
+            uid = input("UID de la carta: ").strip()
+            if uid:
+                api.eliminar_carta(uid)
+        
+        elif opcion == "0":
+            break
+
+
+def main():
+    """Punto de entrada principal."""
+    print("="*60)
+    print("🎮 SISTEMA DE NEGOCIACIÓN")
+    print("="*60)
+    
+    while True:
+        print("\n1. 🤖 Bot Negociador (IA)")
+        print("2. 📡 Operaciones API")
+        print("0. Salir")
+        
+        opcion = input("\nOpción: ").strip()
+        
+        if opcion == "1":
+            alias = input("\nTu alias: ").strip()
+            if alias:
+                menu_bot(alias)
+        elif opcion == "2":
+            menu_api()
+        elif opcion == "0":
+            print("\n¡Hasta luego!")
+            break
+
 
 if __name__ == "__main__":
     main()
