@@ -1,6 +1,6 @@
 import requests
 
-base_url = "http://147.96.81.252:8000"
+base_url = "http://147.96.81.252:7719"
 
 def eliminar_mail(uid):
     """

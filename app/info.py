@@ -1,7 +1,7 @@
 import requests
 
 # Definimos la URL del endpoint
-url = "http://147.96.81.252:8000/info"
+url = "http://147.96.81.252:7719/info"
 
 try:
     # Realizamos la petición GET

@@ -2,7 +2,7 @@ import requests
 import json
 from bot_negociador import BotNegociador
 
-BASE_URL = "http://147.96.81.252:8000"
+BASE_URL = "http://147.96.81.252:7719"
 
 def mostrar_menu():
     """Muestra el menú principal con todas las opciones disponibles"""

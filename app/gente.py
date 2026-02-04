@@ -1,7 +1,7 @@
 import requests
 
 # 1. Definimos los datos
-base_url = "http://147.96.81.252:8000"
+base_url = "http://147.96.81.252:7719"
 
 url = f"{base_url}/gente"
 

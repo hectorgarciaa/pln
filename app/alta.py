@@ -1,11 +1,11 @@
 import requests
 
 # 1. Definimos los datos
-base_url = "http://147.96.81.252:8000"
+base_url = "http://147.96.81.252:7719"
 nombre_alias = "J.L. Abalos"
 
 # 2. Construimos la URL completa (Path Parameter)
-# La URL final será: http://147.96.81.252:8000/alias/Abalos
+# La URL final será: http://147.96.81.252:7719/alias/Abalos
 url = f"{base_url}/alias/{nombre_alias}"
 
 try:

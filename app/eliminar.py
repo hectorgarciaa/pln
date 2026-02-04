@@ -1,9 +1,9 @@
 import requests
 
-base_url = "http://147.96.81.252:8000"
+base_url = "http://147.96.81.252:7719"
 nombre_alias = "Abalos"
 
-# Construimos la URL: http://147.96.81.252:8000/alias/Abalos
+# Construimos la URL: http://147.96.81.252:7719/alias/Abalos
 url = f"{base_url}/alias/{nombre_alias}"
 
 try:

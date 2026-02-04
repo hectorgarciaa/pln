@@ -4,7 +4,7 @@ import time
 from typing import Dict, List, Tuple, Optional
 import re
 
-BASE_URL = "http://147.96.81.252:8000"
+BASE_URL = "http://147.96.81.252:7719"
 OLLAMA_URL = "http://localhost:11434"
 
 
