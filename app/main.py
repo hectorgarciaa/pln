@@ -55,26 +55,29 @@ def revisar_buzon(bot: BotNegociador):
 
 
 def enviar_carta_manual(bot: BotNegociador):
-    """Envía una carta con propuesta generada por IA."""
+    """Envía una carta manualmente."""
     dest = input("Destinatario: ").strip()
     if not dest:
         return
     
-    bot.actualizar_info()
-    propuesta = bot.generar_propuesta(dest)
+    asunto = input("Asunto: ").strip()
+    cuerpo = input("Mensaje: ").strip()
     
-    print(f"\n📋 PROPUESTA GENERADA:")
-    print(f"  Asunto: {propuesta['asunto']}")
-    print(f"  Cuerpo: {propuesta['cuerpo']}")
+    if not asunto or not cuerpo:
+        print("✗ Asunto y mensaje son obligatorios")
+        return
     
-    if input("\n¿Enviar? (s/n): ").lower() == 's':
-        bot.enviar_carta(dest, propuesta['asunto'], propuesta['cuerpo'])
+    resultado = bot._tool_enviar_carta(dest, asunto, cuerpo)
+    if resultado.get('exito'):
+        print(f"✓ {resultado['mensaje']}")
+    else:
+        print(f"✗ {resultado.get('error', 'Error')}")
 
 
 def enviar_paquete_manual(bot: BotNegociador):
     """Envía un paquete de recursos manualmente."""
-    bot.actualizar_info()
-    recursos = bot.get_recursos()
+    estado = bot._tool_ver_estado()
+    recursos = estado.get('recursos', {})
     
     print(f"\nTus recursos: {json.dumps(recursos, ensure_ascii=False)}")
     
@@ -104,7 +107,11 @@ def enviar_paquete_manual(bot: BotNegociador):
     if recursos_enviar:
         print(f"\n📦 Envío: {recursos_enviar} → {dest}")
         if input("¿Confirmar? (s/n): ").lower() == 's':
-            bot.enviar_paquete(dest, recursos_enviar)
+            resultado = bot._tool_enviar_paquete(dest, recursos_enviar)
+            if resultado.get('exito'):
+                print(f"✓ {resultado['mensaje']}")
+            else:
+                print(f"✗ {resultado.get('error', 'Error')}")
 
 
 def cambiar_modelo(bot: BotNegociador):
@@ -128,23 +135,35 @@ def cambiar_modelo(bot: BotNegociador):
             bot.modelo = modelo
 
 
-def procesar_aceptaciones(bot: BotNegociador):
-    """Procesa aceptaciones y ejecuta intercambios."""
-    acuerdos = bot.procesar_respuestas()
+def modo_agente(bot: BotNegociador):
+    """
+    Modo agente: el usuario da instrucciones en lenguaje natural
+    y el modelo decide qué tools usar.
+    """
+    print("\n" + "="*60)
+    print("🤖 MODO AGENTE (Tools)")
+    print("="*60)
+    print("Escribe instrucciones en lenguaje natural.")
+    print("El agente decidirá qué acciones tomar.")
+    print("\nEjemplos:")
+    print("  • 'Muéstrame mi estado actual'")
+    print("  • 'Negocia con todos para conseguir madera'")
+    print("  • 'Revisa el buzón y analiza las ofertas'")
+    print("  • 'Envía 50 oro a Pedro'")
+    print("\nEscribe 'salir' para volver al menú.")
+    print("="*60)
     
-    if not acuerdos:
-        print("\n❌ No hay aceptaciones pendientes")
-        return
-    
-    print(f"\n🎉 {len(acuerdos)} aceptación(es)")
-    
-    for i, acuerdo in enumerate(acuerdos, 1):
-        print(f"\n--- Acuerdo {i} ---")
-        print(f"De: {acuerdo['remitente']}")
-        print(f"Términos: {acuerdo.get('terminos', {})}")
+    while True:
+        instruccion = input("\n🎯 Instrucción: ").strip()
         
-        if input(f"\n¿Ejecutar con {acuerdo['remitente']}? (s/n): ").lower() == 's':
-            bot._ejecutar_acuerdo(acuerdo)
+        if instruccion.lower() in ['salir', 'exit', 'q']:
+            break
+        
+        if not instruccion:
+            continue
+        
+        respuesta = bot.ejecutar_agente(instruccion)
+        print(f"\n💬 Respuesta: {respuesta}")
 
 
 def menu_bot(alias: str):
@@ -155,25 +174,23 @@ def menu_bot(alias: str):
         print("\n" + "="*60)
         print("🤖 BOT NEGOCIADOR")
         print("="*60)
-        print("1. 📊 Ver estado actual")
-        print("2. 🚀 Ejecutar campaña automática")
+        print("1. 🧠 MODO AGENTE (lenguaje natural + tools)")
+        print("2. 📊 Ver estado actual")
         print("3. 📬 Revisar buzón")
         print("4. ✉️  Enviar carta personalizada")
         print("5. 📦 Enviar paquete de recursos")
-        print("6. 🔄 Ciclo completo (automático)")
-        print("7. ✅ Procesar aceptaciones")
-        print("8. 🧹 Limpiar buzón")
-        print("9. 🛡️  Ver lista negra")
-        print(f"10. ⚡ Cambiar modelo ({bot.modelo})")
+        print("6. 🧹 Limpiar buzón")
+        print("7. 🛡️  Ver lista negra")
+        print(f"8. ⚡ Cambiar modelo ({bot.modelo})")
         print("0. Salir")
         print("="*60)
         
         opcion = input("\nOpción: ").strip()
         
         if opcion == "1":
-            mostrar_estado(bot)
+            modo_agente(bot)
         elif opcion == "2":
-            bot.ejecutar_campana()
+            mostrar_estado(bot)
         elif opcion == "3":
             revisar_buzon(bot)
         elif opcion == "4":
@@ -181,23 +198,17 @@ def menu_bot(alias: str):
         elif opcion == "5":
             enviar_paquete_manual(bot)
         elif opcion == "6":
-            rondas = input("Rondas (default 3): ").strip()
-            rondas = int(rondas) if rondas.isdigit() else 3
-            bot.ciclo_completo(rondas)
-        elif opcion == "7":
-            procesar_aceptaciones(bot)
-        elif opcion == "8":
             mantener = input("Mantener últimas (default 10): ").strip()
             mantener = int(mantener) if mantener.isdigit() else 10
             bot.limpiar_buzon(mantener)
-        elif opcion == "9":
+        elif opcion == "7":
             print("\n🛡️ LISTA NEGRA:")
             if bot.lista_negra:
                 for p in bot.lista_negra:
                     print(f"  ⚠️ {p}")
             else:
                 print("  (vacía)")
-        elif opcion == "10":
+        elif opcion == "8":
             cambiar_modelo(bot)
         elif opcion == "0":
             print("\n¡Hasta luego!")
