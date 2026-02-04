@@ -344,7 +344,7 @@ TACTICA: [cómo responder]"""
         
         return analisis
     
-    def revisar_buzon(self) -> List[Dict]:
+    def revisar_buzon(self, auto_limpiar: bool = False) -> List[Dict]:
         """Revisa el buzón en busca de respuestas"""
         if not self.info_actual:
             self.obtener_info()
@@ -352,12 +352,82 @@ TACTICA: [cómo responder]"""
         buzon = self.info_actual.get('Buzon', {})
         cartas_relevantes = []
         
+        # Avisar si el buzón está muy lleno
+        if len(buzon) > 50:
+            print(f"\n⚠️  BUZÓN LLENO: {len(buzon)} cartas")
+            if auto_limpiar:
+                print("🧹 Activando limpieza automática...")
+                self.limpiar_buzon_automatico()
+                self.obtener_info()
+                buzon = self.info_actual.get('Buzon', {})
+        
         for uid, carta in buzon.items():
             # Solo cartas dirigidas a nosotros
             if carta.get('dest') == self.alias:
                 cartas_relevantes.append({**carta, 'uid': uid})
         
         return cartas_relevantes
+    
+    def borrar_carta(self, uid: str) -> bool:
+        """Elimina una carta del buzón por su UID"""
+        try:
+            response = requests.delete(f"{BASE_URL}/mail/{uid}")
+            if response.status_code == 200:
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(f"✗ Error borrando carta: {e}")
+            return False
+    
+    def limpiar_buzon_automatico(self, mantener_ultimas: int = 10):
+        """Limpieza automática inteligente del buzón"""
+        if not self.info_actual:
+            self.obtener_info()
+        
+        buzon = self.info_actual.get('Buzon', {})
+        
+        if not buzon:
+            print("\n✓ El buzón está vacío")
+            return
+        
+        print(f"\n🧹 Limpieza automática del buzón ({len(buzon)} cartas)...")
+        
+        borradas = 0
+        importantes = []
+        
+        for uid, carta in buzon.items():
+            remitente = carta.get('remi', 'Desconocido')
+            
+            # Borrar cartas de lista negra automáticamente
+            if remitente in self.lista_negra:
+                print(f"  🗑️  Borrando carta de {remitente} (lista negra)")
+                if self.borrar_carta(uid):
+                    borradas += 1
+                continue
+            
+            # Borrar cartas que no son para nosotros
+            if carta.get('dest') != self.alias:
+                if self.borrar_carta(uid):
+                    borradas += 1
+                continue
+            
+            # Guardar las demás como importantes
+            importantes.append((uid, carta))
+        
+        # Si aún hay muchas, borrar las más antiguas
+        if len(importantes) > mantener_ultimas:
+            print(f"  📦 Manteniendo solo las {mantener_ultimas} más recientes...")
+            # Borrar las primeras (más antiguas)
+            cartas_a_borrar = importantes[:-mantener_ultimas]
+            
+            for uid, carta in cartas_a_borrar:
+                if self.borrar_carta(uid):
+                    borradas += 1
+        
+        print(f"\n✓ {borradas} cartas eliminadas automáticamente")
+        restantes = len(importantes) - (len(importantes) - mantener_ultimas if len(importantes) > mantener_ultimas else 0)
+        print(f"📬 Buzón: {restantes} cartas restantes")
     
     def ejecutar_campana_negociacion(self, objetivo_prioritario: str = None):
         """
@@ -478,6 +548,7 @@ TACTICA: [cómo responder]"""
             print("4. Ver estado actual")
             print("5. 🛡️  Ver lista negra")
             print(f"6. ⚡ Cambiar modelo (actual: {self.modelo})")
+            print("7. 🧹 Limpieza automática del buzón")
             print("0. Salir")
             print("="*70)
             
@@ -585,6 +656,25 @@ TACTICA: [cómo responder]"""
                         print(f"\n✓ Modelo cambiado a: {self.modelo}")
                 else:
                     print("\n✗ Opción inválida")
+            
+            elif opcion == "7":
+                print("\n🧹 LIMPIEZA AUTOMÁTICA DEL BUZÓN")
+                print("="*50)
+                mantener = input("¿Cuántas cartas mantener? (default 10): ").strip()
+                mantener = int(mantener) if mantener.isdigit() else 10
+                
+                self.obtener_info()
+                buzon = self.info_actual.get('Buzon', {})
+                print(f"\nCartas actuales: {len(buzon)}")
+                
+                if len(buzon) > 0:
+                    confirmar = input(f"¿Proceder con limpieza automática? (s/n): ").lower()
+                    if confirmar == 's':
+                        self.limpiar_buzon_automatico(mantener_ultimas=mantener)
+                    else:
+                        print("\n✗ Limpieza cancelada")
+                else:
+                    print("\n✓ El buzón ya está vacío")
             
             elif opcion == "0":
                 print("\n¡Hasta luego, negociador!")
