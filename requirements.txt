@@ -1,0 +1,13 @@
+# Requirements for Bot Negociador - PLN Project
+# Compatible with uv: https://github.com/astral-sh/uv
+#
+# Install with uv:
+#   uv pip install -r requirements.txt
+#
+# Or create venv + install:
+#   uv venv
+#   source .venv/bin/activate  # Linux/Mac
+#   uv pip install -r requirements.txt
+
+# HTTP requests (API + Ollama)
+requests>=2.32.5
