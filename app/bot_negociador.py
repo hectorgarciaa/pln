@@ -1,7 +1,7 @@
 import requests
 import json
 import time
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import re
 
 BASE_URL = "http://147.96.81.252:8000"
@@ -22,6 +22,8 @@ class BotNegociador:
         self.gente = []
         self.historial_negociaciones = {}
         self.lista_negra = []  # Personas que intentaron robarnos
+        self.acuerdos_pendientes = {}  # Acuerdos negociados pendientes de ejecutar
+        self.intercambios_realizados = []  # Historial de intercambios completados
         
     def obtener_info(self) -> Dict:
         """Obtiene información actual de la API"""
@@ -191,6 +193,320 @@ Mensaje: {mensaje[:200]}"""
         
         return False
     
+
+    def enviar_paquete(self, destinatario: str, recursos: Dict[str, int]) -> bool:
+        """
+        Envía un paquete de recursos a otro jugador.
+        
+        Args:
+            destinatario: Nombre del destinatario
+            recursos: Diccionario con recursos a enviar (ej: {"oro": 100, "madera": 50})
+        
+        Returns:
+            True si el envío fue exitoso
+        """
+        if not recursos:
+            print("⚠️ No hay recursos para enviar")
+            return False
+        
+        # Verificar que tenemos los recursos suficientes
+        self.obtener_info()
+        mis_recursos = self.info_actual.get('Recursos', {})
+        
+        for recurso, cantidad in recursos.items():
+            if mis_recursos.get(recurso, 0) < cantidad:
+                print(f"⚠️ No tienes suficiente {recurso} (tienes {mis_recursos.get(recurso, 0)}, necesitas {cantidad})")
+                return False
+        
+        try:
+            response = requests.post(
+                f"{BASE_URL}/paquete",
+                params={"dest": destinatario},
+                json=recursos
+            )
+            
+            if response.status_code == 200:
+                print(f"✅ Paquete enviado a {destinatario}: {recursos}")
+                self.intercambios_realizados.append({
+                    'tipo': 'enviado',
+                    'destinatario': destinatario,
+                    'recursos': recursos,
+                    'timestamp': time.time()
+                })
+                return True
+            elif response.status_code == 422:
+                print(f"⚠️ Error de validación: {response.json()}")
+                return False
+            else:
+                print(f"⚠️ Error enviando paquete: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"⚠️ Error de conexión: {e}")
+            return False
+    
+    def detectar_aceptacion(self, carta: Dict) -> Optional[Dict]:
+        """
+        Detecta si un mensaje contiene una aceptación de intercambio.
+        Extrae los términos del acuerdo si los hay.
+        
+        Returns:
+            Dict con los términos del acuerdo o None si no hay aceptación
+        """
+        mensaje = carta.get('cuerpo', '').lower()
+        remitente = carta.get('remi', '')
+        
+        # Palabras que indican aceptación
+        palabras_aceptacion = [
+            'acepto', 'trato hecho', 'de acuerdo', 'ok', 'vale', 'perfecto',
+            'hecho', 'me parece bien', 'aceptado', 'sí', 'claro', 'por supuesto',
+            'enviado', 'te envío', 'ahí va', 'recibido', 'gracias por'
+        ]
+        
+        # Palabras que indican rechazo
+        palabras_rechazo = [
+            'no acepto', 'no me interesa', 'no gracias', 'rechazo', 'no puedo',
+            'muy caro', 'demasiado', 'no tengo', 'no quiero'
+        ]
+        
+        # Verificar rechazo primero
+        for palabra in palabras_rechazo:
+            if palabra in mensaje:
+                return None
+        
+        # Verificar aceptación
+        hay_aceptacion = any(palabra in mensaje for palabra in palabras_aceptacion)
+        
+        if not hay_aceptacion:
+            # Usar IA para casos ambiguos
+            prompt = f"""¿Este mensaje acepta un intercambio? Responde solo ACEPTA o RECHAZA.
+Mensaje: {mensaje[:200]}"""
+            respuesta = self.consultar_ollama(prompt, timeout=30, usar_fallback=False)
+            hay_aceptacion = "ACEPTA" in respuesta.upper() if respuesta else False
+        
+        if hay_aceptacion:
+            # Intentar extraer términos del acuerdo
+            terminos = self.extraer_terminos_intercambio(mensaje)
+            return {
+                'remitente': remitente,
+                'aceptacion': True,
+                'terminos': terminos,
+                'mensaje_original': carta.get('cuerpo', '')
+            }
+        
+        return None
+    
+    def extraer_terminos_intercambio(self, mensaje: str) -> Dict:
+        """
+        Extrae los recursos y cantidades mencionados en un mensaje.
+        
+        Returns:
+            Dict con 'ofrece' y 'pide' que contienen los recursos
+        """
+        recursos_conocidos = ['oro', 'madera', 'piedra', 'comida', 'hierro', 'trigo', 
+                             'carbon', 'agua', 'plata', 'cobre', 'diamante', 'lana',
+                             'tela', 'cuero', 'cristal', 'acero']
+        
+        terminos = {'ofrece': {}, 'pide': {}}
+        
+        # Buscar patrones como "100 oro", "50 de madera", etc.
+        patron = r'(\d+)\s*(?:de\s+)?(' + '|'.join(recursos_conocidos) + r')'
+        matches = re.findall(patron, mensaje.lower())
+        
+        for cantidad, recurso in matches:
+            # Por defecto, asumimos que lo que menciona es lo que ofrece
+            terminos['ofrece'][recurso] = int(cantidad)
+        
+        # Si no se encontró nada, usar IA
+        if not terminos['ofrece']:
+            prompt = f"""Del mensaje, extrae recursos y cantidades. Formato: RECURSO:CANTIDAD
+Mensaje: {mensaje[:200]}
+Respuesta (ej: oro:100, madera:50):"""
+            
+            respuesta = self.consultar_ollama(prompt, timeout=30, usar_fallback=False)
+            if respuesta:
+                # Parsear respuesta de IA
+                for match in re.findall(r'(\w+):(\d+)', respuesta.lower()):
+                    recurso, cantidad = match
+                    if recurso in recursos_conocidos:
+                        terminos['ofrece'][recurso] = int(cantidad)
+        
+        return terminos
+    
+    def ejecutar_intercambio(self, acuerdo: Dict) -> bool:
+        """
+        Ejecuta un intercambio acordado enviando los recursos.
+        
+        Args:
+            acuerdo: Dict con 'remitente' y 'terminos' del intercambio
+        
+        Returns:
+            True si el intercambio se ejecutó correctamente
+        """
+        remitente = acuerdo.get('remitente')
+        terminos = acuerdo.get('terminos', {})
+        
+        if not remitente:
+            print("⚠️ No se especificó el remitente")
+            return False
+        
+        # Verificar si está en lista negra
+        if remitente in self.lista_negra:
+            print(f"🚨 {remitente} está en la lista negra. No se ejecutará el intercambio.")
+            return False
+        
+        # Determinar qué debemos enviar nosotros
+        # Esto depende de lo que habíamos ofrecido en la negociación
+        if remitente in self.historial_negociaciones:
+            negociacion = self.historial_negociaciones[remitente]
+            # Buscar en el cuerpo del mensaje qué ofrecimos
+            cuerpo = negociacion.get('estrategia', {}).get('cuerpo', '')
+            nuestros_terminos = self.extraer_terminos_intercambio(cuerpo)
+            
+            if nuestros_terminos.get('ofrece'):
+                print(f"\n📦 Preparando envío a {remitente}:")
+                print(f"   Recursos: {nuestros_terminos['ofrece']}")
+                
+                confirmacion = input("\n¿Confirmar envío? (s/n): ").lower()
+                if confirmacion == 's':
+                    return self.enviar_paquete(remitente, nuestros_terminos['ofrece'])
+                else:
+                    print("❌ Envío cancelado")
+                    return False
+        
+        # Si no hay historial, preguntar qué enviar
+        print(f"\n📦 Intercambio con {remitente}")
+        print("No se encontró un acuerdo previo. ¿Qué deseas enviar?")
+        
+        self.obtener_info()
+        excedentes = self.identificar_excedentes()
+        print(f"Tus excedentes: {excedentes}")
+        
+        recursos_a_enviar = {}
+        while True:
+            recurso = input("Recurso a enviar (o 'fin' para terminar): ").strip().lower()
+            if recurso == 'fin':
+                break
+            cantidad = input(f"Cantidad de {recurso}: ").strip()
+            if cantidad.isdigit():
+                recursos_a_enviar[recurso] = int(cantidad)
+        
+        if recursos_a_enviar:
+            return self.enviar_paquete(remitente, recursos_a_enviar)
+        
+        return False
+    
+    def procesar_respuestas_automatico(self) -> List[Dict]:
+        """
+        Procesa automáticamente las respuestas del buzón.
+        Detecta aceptaciones y ejecuta intercambios.
+        
+        Returns:
+            Lista de acuerdos detectados
+        """
+        self.obtener_info()
+        cartas = self.revisar_buzon()
+        
+        acuerdos_detectados = []
+        
+        print(f"\n📬 Procesando {len(cartas)} mensajes...")
+        
+        for carta in cartas:
+            remitente = carta.get('remi', 'Desconocido')
+            
+            # Saltar lista negra
+            if remitente in self.lista_negra:
+                print(f"⚠️ Ignorando mensaje de {remitente} (lista negra)")
+                continue
+            
+            # Detectar si es un intento de robo
+            if self.detectar_intento_robo(carta):
+                print(f"🚨 Intento de robo detectado de {remitente}")
+                continue
+            
+            # Detectar si es una aceptación
+            acuerdo = self.detectar_aceptacion(carta)
+            
+            if acuerdo:
+                print(f"\n✅ ACEPTACIÓN DETECTADA de {remitente}!")
+                print(f"   Mensaje: {carta.get('cuerpo', '')[:100]}...")
+                
+                if acuerdo.get('terminos', {}).get('ofrece'):
+                    print(f"   Términos detectados: {acuerdo['terminos']}")
+                
+                acuerdos_detectados.append(acuerdo)
+                self.acuerdos_pendientes[remitente] = acuerdo
+            else:
+                # No es aceptación, analizar como contraoferta
+                print(f"\n💬 Mensaje de {remitente}: {carta.get('cuerpo', '')[:80]}...")
+                analisis = self.analizar_respuesta(carta)
+                print(f"   Evaluación: {analisis.get('evaluacion', 'Sin evaluar')}")
+        
+        if acuerdos_detectados:
+            print(f"\n🎉 {len(acuerdos_detectados)} acuerdo(s) pendiente(s) de ejecutar")
+            
+        return acuerdos_detectados
+    
+    def ciclo_negociacion_completo(self, max_rondas: int = 3):
+        """
+        Ejecuta un ciclo completo de negociación:
+        1. Envía propuestas
+        2. Espera respuestas
+        3. Detecta aceptaciones
+        4. Ejecuta intercambios
+        
+        Args:
+            max_rondas: Número máximo de rondas de negociación
+        """
+        print("="*70)
+        print("🔄 CICLO DE NEGOCIACIÓN COMPLETO")
+        print("="*70)
+        
+        for ronda in range(1, max_rondas + 1):
+            print(f"\n{'='*70}")
+            print(f"📍 RONDA {ronda} de {max_rondas}")
+            print("="*70)
+            
+            # 1. Ejecutar campaña de negociación
+            self.ejecutar_campana_negociacion()
+            
+            # 2. Esperar respuestas
+            print(f"\n⏳ Esperando respuestas (30 segundos)...")
+            time.sleep(30)
+            
+            # 3. Procesar respuestas
+            acuerdos = self.procesar_respuestas_automatico()
+            
+            # 4. Ejecutar intercambios pendientes
+            if acuerdos:
+                print(f"\n📦 EJECUTANDO INTERCAMBIOS...")
+                for acuerdo in acuerdos:
+                    print(f"\n→ Procesando acuerdo con {acuerdo['remitente']}...")
+                    self.ejecutar_intercambio(acuerdo)
+            
+            # 5. Verificar si completamos el objetivo
+            self.obtener_info()
+            if self.objetivo_completado():
+                print(f"\n🏆 ¡OBJETIVO COMPLETADO en ronda {ronda}!")
+                break
+            
+            # Pausa entre rondas
+            if ronda < max_rondas:
+                print(f"\n⏳ Pausa antes de la siguiente ronda...")
+                time.sleep(10)
+        
+        # Resumen final
+        print("\n" + "="*70)
+        print("📊 RESUMEN DE NEGOCIACIONES")
+        print("="*70)
+        print(f"Intercambios realizados: {len(self.intercambios_realizados)}")
+        for intercambio in self.intercambios_realizados:
+            print(f"  → {intercambio['tipo']} a {intercambio.get('destinatario', 'N/A')}: {intercambio['recursos']}")
+        
+        self.obtener_info()
+        print(f"\nEstado final:")
+        print(f"  Oro: {self.obtener_oro_actual()}")
+        print(f"  Objetivo completado: {'✅ SÍ' if self.objetivo_completado() else '❌ NO'}")
 
     
     def generar_estrategia_negociacion(self, destinatario: str, necesidades: Dict[str, int], 
@@ -549,6 +865,9 @@ TACTICA: [cómo responder]"""
             print("5. 🛡️  Ver lista negra")
             print(f"6. ⚡ Cambiar modelo (actual: {self.modelo})")
             print("7. 🧹 Limpieza automática del buzón")
+            print("8. 📦 Enviar paquete de recursos")
+            print("9. 🔄 Ciclo de negociación completo (auto)")
+            print("10. ✅ Procesar aceptaciones y ejecutar intercambios")
             print("0. Salir")
             print("="*70)
             
@@ -675,6 +994,95 @@ TACTICA: [cómo responder]"""
                         print("\n✗ Limpieza cancelada")
                 else:
                     print("\n✓ El buzón ya está vacío")
+            
+            elif opcion == "8":
+                print("\n📦 ENVIAR PAQUETE DE RECURSOS")
+                print("="*50)
+                
+                self.obtener_info()
+                mis_recursos = self.info_actual.get('Recursos', {})
+                print(f"\nTus recursos actuales: {json.dumps(mis_recursos, ensure_ascii=False)}")
+                
+                dest = input("\nDestinatario: ").strip()
+                if not dest:
+                    print("✗ Debes especificar un destinatario")
+                    continue
+                
+                recursos_a_enviar = {}
+                print("\nIntroduce los recursos a enviar (escribe 'fin' para terminar):")
+                
+                while True:
+                    recurso = input("  Recurso: ").strip().lower()
+                    if recurso == 'fin':
+                        break
+                    if recurso not in mis_recursos:
+                        print(f"  ⚠️ No tienes {recurso}")
+                        continue
+                    cantidad = input(f"  Cantidad de {recurso}: ").strip()
+                    if cantidad.isdigit():
+                        cant_int = int(cantidad)
+                        if cant_int <= mis_recursos.get(recurso, 0):
+                            recursos_a_enviar[recurso] = cant_int
+                        else:
+                            print(f"  ⚠️ Solo tienes {mis_recursos.get(recurso, 0)} de {recurso}")
+                
+                if recursos_a_enviar:
+                    print(f"\n📦 Resumen del envío:")
+                    print(f"   Destinatario: {dest}")
+                    print(f"   Recursos: {recursos_a_enviar}")
+                    
+                    confirmar = input("\n¿Confirmar envío? (s/n): ").lower()
+                    if confirmar == 's':
+                        self.enviar_paquete(dest, recursos_a_enviar)
+                    else:
+                        print("✗ Envío cancelado")
+                else:
+                    print("✗ No se especificaron recursos")
+            
+            elif opcion == "9":
+                print("\n🔄 CICLO DE NEGOCIACIÓN COMPLETO")
+                print("="*50)
+                print("Este modo ejecuta automáticamente:")
+                print("  1. Envía propuestas de negociación")
+                print("  2. Espera respuestas")
+                print("  3. Detecta aceptaciones")
+                print("  4. Ejecuta intercambios")
+                print("="*50)
+                
+                rondas = input("\n¿Cuántas rondas máximo? (default 3): ").strip()
+                rondas = int(rondas) if rondas.isdigit() else 3
+                
+                confirmar = input(f"\n¿Iniciar ciclo de {rondas} rondas? (s/n): ").lower()
+                if confirmar == 's':
+                    self.ciclo_negociacion_completo(max_rondas=rondas)
+                else:
+                    print("✗ Ciclo cancelado")
+            
+            elif opcion == "10":
+                print("\n✅ PROCESAR ACEPTACIONES E INTERCAMBIOS")
+                print("="*50)
+                
+                acuerdos = self.procesar_respuestas_automatico()
+                
+                if acuerdos:
+                    print(f"\n🎉 Se detectaron {len(acuerdos)} aceptación(es)")
+                    
+                    for i, acuerdo in enumerate(acuerdos, 1):
+                        print(f"\n--- Acuerdo {i} ---")
+                        print(f"De: {acuerdo['remitente']}")
+                        print(f"Términos: {acuerdo.get('terminos', {})}")
+                        
+                        ejecutar = input(f"\n¿Ejecutar intercambio con {acuerdo['remitente']}? (s/n): ").lower()
+                        if ejecutar == 's':
+                            self.ejecutar_intercambio(acuerdo)
+                else:
+                    print("\n❌ No se detectaron aceptaciones en el buzón")
+                
+                # Mostrar acuerdos pendientes
+                if self.acuerdos_pendientes:
+                    print(f"\n📋 Acuerdos pendientes: {len(self.acuerdos_pendientes)}")
+                    for persona, acuerdo in self.acuerdos_pendientes.items():
+                        print(f"  → {persona}")
             
             elif opcion == "0":
                 print("\n¡Hasta luego, negociador!")
