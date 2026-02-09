@@ -33,7 +33,9 @@ OLLAMA_PARAMS = {
 RECURSOS_CONOCIDOS = [
     'oro', 'madera', 'piedra', 'comida', 'hierro', 'trigo',
     'carbon', 'agua', 'plata', 'cobre', 'diamante', 'lana',
-    'tela', 'cuero', 'cristal', 'acero'
+    'tela', 'cuero', 'cristal', 'acero', 'ladrillos', 'arroz',
+    'queso', 'pan', 'leche', 'carne', 'pescado', 'fruta',
+    'verdura', 'sal', 'azucar', 'miel', 'vino', 'cerveza'
 ]
 
 # Detección de robos

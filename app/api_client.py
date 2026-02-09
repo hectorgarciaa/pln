@@ -132,16 +132,24 @@ class APIClient:
     def enviar_paquete(self, destinatario: str, recursos: Dict[str, int]) -> bool:
         """Envía un paquete de recursos a otro jugador."""
         try:
+            # Intentar primero con dest en path (formato más común en este servidor)
             response = self.session.post(
                 f"{self.base_url}/paquete/{destinatario}",
                 json=recursos
             )
+            # Si 404, probar con query param
+            if response.status_code == 404:
+                response = self.session.post(
+                    f"{self.base_url}/paquete",
+                    params={"dest": destinatario},
+                    json=recursos
+                )
             if response.status_code == 200:
                 return True
             elif response.status_code == 422:
                 print(f"⚠ Error de validación: {response.json()}")
             else:
-                print(f"⚠ Error enviando paquete: {response.status_code}")
+                print(f"⚠ Error enviando paquete: {response.status_code} - {response.text}")
             return False
         except requests.RequestException as e:
             print(f"⚠ Error de conexión: {e}")
