@@ -1,8 +1,16 @@
 """
 Interfaz de usuario.
 Punto de entrada principal del programa.
+
+Uso interactivo:
+    python main.py
+
+Uso automático (para lanzar desde test_runner.py):
+    python main.py --alias Bot_1 --modelo llama3.2:3b --debug --max-rondas 10 --pausa 15
 """
 
+import sys
+import argparse
 import json
 from negociador import AgenteNegociador
 from api_client import APIClient
@@ -11,7 +19,7 @@ from config import MODELOS_DISPONIBLES, MODELO_DEFAULT
 
 def menu_agente(alias: str):
     """
-    Menú del bot negociador autónomo.
+    Menú del bot negociador autónomo (modo interactivo).
     """
     print("\n" + "="*60)
     print("🤖 CONFIGURACIÓN DEL AGENTE")
@@ -52,7 +60,22 @@ def menu_agente(alias: str):
     if input("\n¿Iniciar agente? (s/n): ").strip().lower() != 's':
         return
     
-    # Crear y ejecutar agente
+    _ejecutar_agente(alias, modelo, debug, max_rondas, pausa, interactivo=True)
+
+
+def _ejecutar_agente(alias: str, modelo: str, debug: bool,
+                     max_rondas: int, pausa: int, interactivo: bool = False):
+    """
+    Crea y ejecuta el agente negociador.
+
+    Args:
+        alias: Nombre del bot.
+        modelo: Modelo de IA a usar.
+        debug: Activar modo debug.
+        max_rondas: Máximo de rondas.
+        pausa: Segundos entre rondas.
+        interactivo: Si True, muestra menú post-ejecución.
+    """
     agente = AgenteNegociador(alias, modelo, debug)
     agente.pausa_entre_rondas = pausa
     
@@ -61,8 +84,11 @@ def menu_agente(alias: str):
     except KeyboardInterrupt:
         print("\n\n⏹️ Agente detenido por el usuario")
         agente._mostrar_resumen()
-    
-    # Opciones post-ejecución
+
+    if not interactivo:
+        return
+
+    # Opciones post-ejecución (solo en modo interactivo)
     while True:
         print("\n" + "="*60)
         print("📜 OPCIONES POST-EJECUCIÓN")
@@ -180,8 +206,62 @@ def menu_api():
             break
 
 
+def parse_args():
+    """Parsea argumentos de línea de comandos."""
+    parser = argparse.ArgumentParser(
+        description="Agente Negociador Autónomo para fdi-pln-butler",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Ejemplos:
+  Modo interactivo (menú):
+    python main.py
+
+  Lanzar bot directamente:
+    python main.py --alias Bot_1
+    python main.py --alias Bot_1 --modelo llama3.2:3b --debug --max-rondas 15 --pausa 20
+        """
+    )
+    parser.add_argument(
+        "--alias", type=str, default=None,
+        help="Nombre/alias del bot. Si se proporciona, se ejecuta en modo automático (sin menú interactivo)."
+    )
+    parser.add_argument(
+        "--modelo", type=str, default=MODELO_DEFAULT,
+        help=f"Modelo de IA a usar (default: {MODELO_DEFAULT})"
+    )
+    parser.add_argument(
+        "--debug", action="store_true", default=False,
+        help="Activar modo debug (muestra cada decisión del agente)"
+    )
+    parser.add_argument(
+        "--max-rondas", type=int, default=10,
+        help="Número máximo de rondas de negociación (default: 10)"
+    )
+    parser.add_argument(
+        "--pausa", type=int, default=30,
+        help="Segundos de espera entre rondas (default: 30)"
+    )
+    return parser.parse_args()
+
+
 def main():
     """Punto de entrada principal."""
+    args = parse_args()
+
+    # ─── Modo automático (CLI) ───────────────────────────────────────────
+    if args.alias:
+        print(f"🤖 Iniciando bot '{args.alias}' en modo automático...")
+        _ejecutar_agente(
+            alias=args.alias,
+            modelo=args.modelo,
+            debug=args.debug,
+            max_rondas=args.max_rondas,
+            pausa=args.pausa,
+            interactivo=False,
+        )
+        return
+
+    # ─── Modo interactivo (menú) ─────────────────────────────────────────
     print("="*60)
     print("🎮 SISTEMA DE NEGOCIACIÓN AUTÓNOMO")
     print("="*60)

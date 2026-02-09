@@ -176,14 +176,25 @@ class AgenteNegociador:
     
     def _obtener_jugadores_disponibles(self) -> List[str]:
         """Devuelve jugadores que podemos contactar."""
-        alias_propios = self.info_actual.get('Alias', []) if self.info_actual else []
+        alias_propios_raw = self.info_actual.get('Alias', []) if self.info_actual else []
         
-        return [
+        # La API puede devolver un string o una lista — normalizar a lista
+        if isinstance(alias_propios_raw, str):
+            alias_propios = [alias_propios_raw]
+        else:
+            alias_propios = alias_propios_raw
+        
+        disponibles = [
             p for p in self.gente
             if p != self.alias 
             and p not in alias_propios
             and p not in self.lista_negra
         ]
+        
+        if not disponibles:
+            self._log("INFO", f"No hay jugadores disponibles (gente={self.gente}, mis_alias={alias_propios}, lista_negra={self.lista_negra})")
+        
+        return disponibles
     
     # =========================================================================
     # ANÁLISIS DE MENSAJES
@@ -456,6 +467,10 @@ Responde SOLO en este formato JSON:
         # Filtrar ya contactados esta ronda
         jugadores = [j for j in jugadores if j not in self.contactados_esta_ronda]
         
+        if not jugadores:
+            self._log("INFO", "No hay jugadores a quienes enviar propuestas esta ronda")
+            return
+        
         # Limitar a 5 por ronda para no saturar
         jugadores = jugadores[:5]
         
@@ -546,6 +561,10 @@ Responde SOLO en este formato JSON:
         print(f"Debug: {'ACTIVADO' if self.debug else 'desactivado'}")
         print(f"Max rondas: {max_rondas}")
         print("="*60)
+        
+        # Registrar alias en la API para que otros jugadores nos vean
+        if not self.api.crear_alias(self.alias):
+            print(f"⚠ No se pudo crear el alias '{self.alias}', puede que ya exista.")
         
         for ronda in range(1, max_rondas + 1):
             print(f"\n🔄 RONDA {ronda}/{max_rondas}")

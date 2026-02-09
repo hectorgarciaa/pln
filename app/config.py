@@ -3,8 +3,8 @@ Configuración centralizada del proyecto.
 """
 
 # URLs de las APIs
-API_BASE_URL = "http://147.96.81.252:7719"
-OLLAMA_URL = "http://localhost:11434"
+API_BASE_URL = "http://127.0.0.1:7719"
+OLLAMA_URL = "http://127.0.0.1:11434"
 
 # Modelos de IA disponibles
 MODELOS_DISPONIBLES = {
@@ -22,8 +22,10 @@ OLLAMA_PARAMS = {
     "top_p": 0.7,
     "top_k": 20,
     "repeat_penalty": 1.2,
-    "num_predict": 150,
-    "num_ctx": 1024,
+    "num_predict": 100,      
+    "num_ctx": 2048,         
+    "num_gpu": 1,            
+    "num_thread": 8,         
     "stop": ["\n\n", "---"],
 }
 
