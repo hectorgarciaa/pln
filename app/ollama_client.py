@@ -1,5 +1,5 @@
 """
-Cliente Ollama para consultas de IA.
+Cliente Ollama para consultas de IA (librería oficial).
 
 ═══════════════════════════════════════════════════════════════════════════════
 USO:
@@ -7,12 +7,12 @@ USO:
 
     from ollama_client import OllamaClient
     
-    ia = OllamaClient("qwen3-vl:8b")
+    ia = OllamaClient("qwen3:8b")
     
-    # Consulta simple
+    # Consulta simple (con progreso en pantalla)
     respuesta = ia.consultar("¿Cómo estás?")
     
-    # Consulta sin mostrar progreso
+    # Consulta silenciosa (sin imprimir nada)
     respuesta = ia.consultar("...", mostrar_progreso=False)
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -23,7 +23,7 @@ CONTROL DE PENSAMIENTO (modelos qwen3):
   Este cliente detecta esos bloques y:
     1. Si DISABLE_THINK=True → añade /no_think al prompt para evitarlos.
     2. Si DISABLE_THINK=False → permite pensar pero corta si supera
-       THINK_TIMEOUT segundos y extrae la respuesta parcial.
+       THINK_TIMEOUT segundos y reintenta con /no_think.
     3. Siempre limpia los bloques <think> de la respuesta final.
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -31,8 +31,7 @@ CONTROL DE PENSAMIENTO (modelos qwen3):
 
 import re
 import time
-import requests
-import json
+import ollama
 from config import OLLAMA_URL, OLLAMA_PARAMS, THINK_TIMEOUT, DISABLE_THINK
 
 
@@ -43,11 +42,13 @@ _MODELOS_CON_THINK = ('qwen3',)
 class OllamaClient:
     """
     Cliente para consultas a Ollama con control de pensamiento.
+    Usa la librería oficial `ollama` en vez de requests.
     """
     
     def __init__(self, modelo: str):
         self.modelo = modelo
-        self.url = f"{OLLAMA_URL}/api/generate"
+        # Crear cliente apuntando al host configurado
+        self.client = ollama.Client(host=OLLAMA_URL)
         # ¿Este modelo usa bloques <think>?
         self.soporta_think = any(m in modelo.lower() for m in _MODELOS_CON_THINK)
     
@@ -78,8 +79,8 @@ class OllamaClient:
         Envía un prompt a Ollama y devuelve la respuesta.
         
         Si el modelo se queda "pensando" (bloque <think>) más de
-        THINK_TIMEOUT segundos, corta la generación y devuelve
-        lo que haya generado hasta el momento (sin el bloque think).
+        THINK_TIMEOUT segundos, corta la generación y reintenta
+        con /no_think para obtener respuesta directa.
         
         Args:
             prompt: El texto a enviar
@@ -91,131 +92,120 @@ class OllamaClient:
         """
         prompt = self._preparar_prompt(prompt)
         
-        payload = {
-            "model": self.modelo,
-            "prompt": prompt,
-            "stream": True,  # Siempre streaming para controlar pensamiento
-            **OLLAMA_PARAMS
-        }
-        
         try:
-            respuesta_completa = ""
-            dentro_de_think = False
-            think_inicio = None
-            pensamiento_cortado = False
-            
-            with requests.post(
-                self.url, 
-                json=payload, 
-                timeout=timeout,
-                stream=True
-            ) as response:
-                response.raise_for_status()
-                
-                for linea in response.iter_lines(decode_unicode=True):
-                    if linea:
-                        try:
-                            data = json.loads(linea)
-                            chunk = data.get('response', '')
-                            respuesta_completa += chunk
-                            
-                            # ── Detección de <think> ──
-                            if '<think>' in chunk.lower():
-                                dentro_de_think = True
-                                think_inicio = time.time()
-                                if mostrar_progreso:
-                                    print("🧠 (pensando...) ", end='', flush=True)
-                            
-                            if '</think>' in chunk.lower():
-                                dentro_de_think = False
-                                think_inicio = None
-                                if mostrar_progreso:
-                                    print("✓", end=' ', flush=True)
-                            
-                            # ── Timeout de pensamiento ──
-                            if dentro_de_think and think_inicio:
-                                tiempo_pensando = time.time() - think_inicio
-                                if tiempo_pensando > THINK_TIMEOUT:
-                                    pensamiento_cortado = True
-                                    if mostrar_progreso:
-                                        print(f" ✂ cortado ({tiempo_pensando:.0f}s)", flush=True)
-                                    # Cerramos la conexión para parar la generación
-                                    break
-                            
-                            # Solo mostrar tokens fuera de <think>
-                            if mostrar_progreso and not dentro_de_think:
-                                # Mostrar solo la parte fuera de think
-                                texto_visible = self._limpiar_think(chunk)
-                                if texto_visible:
-                                    print(texto_visible, end='', flush=True)
-                            
-                            if data.get('done'):
-                                break
-                                
-                        except json.JSONDecodeError:
-                            continue
-            
             if mostrar_progreso:
-                print()  # Nueva línea al final
-            
-            # Limpiar bloques <think> de la respuesta
-            respuesta_limpia = self._limpiar_think(respuesta_completa)
-            
-            if pensamiento_cortado and not respuesta_limpia:
-                # El modelo se cortó mientras pensaba y no generó respuesta útil.
-                # Reintentar con /no_think si el modelo lo soporta.
-                if self.soporta_think:
-                    if mostrar_progreso:
-                        print("  🔄 Reintentando sin pensamiento...", flush=True)
-                    return self._consultar_sin_think(prompt, timeout, mostrar_progreso)
-                return "Error: El modelo se quedó pensando sin generar respuesta"
-            
-            return respuesta_limpia
-                
-        except requests.exceptions.Timeout:
-            return "Error: Timeout - El modelo tardó demasiado en responder"
-        except requests.exceptions.RequestException as e:
-            return f"Error de conexión: {str(e)}"
+                return self._consultar_streaming(prompt, timeout)
+            else:
+                return self._consultar_simple(prompt, timeout)
+        except ollama.ResponseError as e:
+            return f"Error del modelo: {e.error}"
+        except ollama.RequestError as e:
+            return f"Error de conexión con Ollama: {e}"
         except Exception as e:
             return f"Error: {str(e)}"
     
-    def _consultar_sin_think(self, prompt: str, timeout: int = 60,
-                             mostrar_progreso: bool = False) -> str:
+    def _consultar_streaming(self, prompt: str, timeout: int) -> str:
+        """
+        Consulta con streaming: muestra la respuesta en tiempo real
+        y controla el tiempo de pensamiento.
+        """
+        respuesta_completa = ""
+        dentro_de_think = False
+        think_inicio = None
+        pensamiento_cortado = False
+        inicio_global = time.time()
+        
+        stream = self.client.generate(
+            model=self.modelo,
+            prompt=prompt,
+            stream=True,
+            options=OLLAMA_PARAMS
+        )
+        
+        for chunk in stream:
+            texto = chunk.get('response', '')
+            respuesta_completa += texto
+            
+            # ── Timeout global ──
+            if time.time() - inicio_global > timeout:
+                print("\n⏱ Timeout general alcanzado")
+                break
+            
+            # ── Detección de <think> ──
+            if '<think>' in texto.lower() and not dentro_de_think:
+                dentro_de_think = True
+                think_inicio = time.time()
+                print("🧠 (pensando...) ", end='', flush=True)
+            
+            if '</think>' in texto.lower() and dentro_de_think:
+                dentro_de_think = False
+                think_inicio = None
+                print("✓", end=' ', flush=True)
+            
+            # ── Timeout de pensamiento ──
+            if dentro_de_think and think_inicio:
+                tiempo_pensando = time.time() - think_inicio
+                if tiempo_pensando > THINK_TIMEOUT:
+                    pensamiento_cortado = True
+                    print(f" ✂ cortado ({tiempo_pensando:.0f}s)", flush=True)
+                    break
+            
+            # Solo mostrar tokens fuera de <think>
+            if not dentro_de_think:
+                texto_visible = self._limpiar_think(texto)
+                if texto_visible:
+                    print(texto_visible, end='', flush=True)
+            
+            if chunk.get('done'):
+                break
+        
+        print()  # Nueva línea al final
+        
+        # Limpiar bloques <think> de la respuesta
+        respuesta_limpia = self._limpiar_think(respuesta_completa)
+        
+        if pensamiento_cortado and not respuesta_limpia:
+            # Se cortó pensando sin generar respuesta útil → reintentar
+            if self.soporta_think:
+                print("  🔄 Reintentando sin pensamiento...", flush=True)
+                return self._consultar_sin_think(prompt, timeout)
+            return "Error: El modelo se quedó pensando sin generar respuesta"
+        
+        return respuesta_limpia
+    
+    def _consultar_simple(self, prompt: str, timeout: int) -> str:
+        """Consulta sin streaming: devuelve respuesta completa de golpe."""
+        response = self.client.generate(
+            model=self.modelo,
+            prompt=prompt,
+            stream=False,
+            options=OLLAMA_PARAMS
+        )
+        return self._limpiar_think(response.get('response', ''))
+    
+    def _consultar_sin_think(self, prompt: str, timeout: int) -> str:
         """
         Reintento forzando /no_think para modelos que se quedaron
         atascados pensando.
         """
-        # Añadir /no_think si no lo tiene ya
         if not prompt.strip().startswith('/no_think'):
             prompt = f"/no_think\n{prompt}"
         
-        payload = {
-            "model": self.modelo,
-            "prompt": prompt,
-            "stream": False,
-            **OLLAMA_PARAMS
-        }
-        
         try:
-            response = requests.post(
-                self.url,
-                json=payload,
-                timeout=timeout
+            response = self.client.generate(
+                model=self.modelo,
+                prompt=prompt,
+                stream=False,
+                options=OLLAMA_PARAMS
             )
-            response.raise_for_status()
-            data = response.json()
-            respuesta = data.get('response', '').strip()
-            return self._limpiar_think(respuesta)
+            return self._limpiar_think(response.get('response', ''))
         except Exception as e:
             return f"Error (reintento sin think): {str(e)}"
     
     def ping(self) -> bool:
         """Verifica si Ollama está disponible."""
         try:
-            response = requests.get(
-                f"{OLLAMA_URL}/api/tags", 
-                timeout=5
-            )
-            return response.status_code == 200
-        except:
+            self.client.list()
+            return True
+        except Exception:
             return False

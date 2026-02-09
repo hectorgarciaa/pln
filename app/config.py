@@ -32,7 +32,7 @@ OLLAMA_PARAMS = {
 
 # Control de pensamiento para modelos qwen3
 # Máx. segundos que se permite al modelo "pensar" (bloques <think>)
-THINK_TIMEOUT = 10
+THINK_TIMEOUT = 25
 # Si True, desactiva el pensamiento en modelos que lo soportan (añade /no_think)
 DISABLE_THINK = False
 
