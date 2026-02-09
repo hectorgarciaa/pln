@@ -276,50 +276,59 @@ Responde SOLO en este formato JSON:
     # =========================================================================
     # GENERACIÓN DE PROPUESTAS
     # =========================================================================
-    
-    def _generar_propuesta(self, destinatario: str, necesidades: Dict, 
-                           excedentes: Dict, oro: int) -> Dict[str, str]:
-        """Genera una propuesta de negociación."""
-        
-        # Si tenemos excedentes, ofrecer intercambio
+
+    def _generar_propuesta(self, destinatario: str, necesidades: Dict,
+                           excedentes: Dict, oro: int) -> Optional[Dict[str, str]]:
+        """
+        Genera una propuesta de negociación con formato estructurado.
+
+        Las propuestas incluyen etiquetas [OFREZCO] y [PIDO] para que el
+        receptor pueda parsear exactamente qué se intercambia y decidir
+        de forma automática.
+        """
+
+        ofrezco: Dict[str, int] = {}
+        pido: Dict[str, int] = {}
+
         if excedentes and necesidades:
-            recurso_necesito = list(necesidades.keys())[0]
-            cantidad_necesito = necesidades[recurso_necesito]
+            # Intercambio recurso por recurso
+            recurso_pido = list(necesidades.keys())[0]
+            cantidad_pido = min(necesidades[recurso_pido], 3)  # máx 3 por propuesta
             recurso_ofrezco = list(excedentes.keys())[0]
-            cantidad_ofrezco = min(excedentes[recurso_ofrezco], cantidad_necesito)
-            
-            return {
-                "asunto": f"Intercambio: mi {recurso_ofrezco} por tu {recurso_necesito}",
-                "cuerpo": f"Hola {destinatario}! Tengo {cantidad_ofrezco} {recurso_ofrezco} de sobra. "
-                         f"¿Tienes {cantidad_necesito} {recurso_necesito}? Podemos hacer un intercambio justo. Saludos!"
-            }
-        
-        # Si solo necesitamos, ofrecer oro
-        elif necesidades and oro > 0:
-            recurso_necesito = list(necesidades.keys())[0]
-            cantidad_necesito = necesidades[recurso_necesito]
-            
-            return {
-                "asunto": f"Compro {recurso_necesito}",
-                "cuerpo": f"Hola {destinatario}! Necesito {cantidad_necesito} {recurso_necesito}. "
-                         f"Puedo pagar en oro. ¿Cuánto pides? Saludos!"
-            }
-        
-        # Si solo tenemos excedentes (modo maximizar oro)
+            cantidad_ofrezco = min(excedentes[recurso_ofrezco], cantidad_pido + 1)  # oferta generosa
+            ofrezco = {recurso_ofrezco: cantidad_ofrezco}
+            pido = {recurso_pido: cantidad_pido}
+        elif necesidades and oro > 2:
+            # Comprar con oro
+            recurso_pido = list(necesidades.keys())[0]
+            cantidad_pido = min(necesidades[recurso_pido], 2)
+            precio = cantidad_pido * 2  # 2 oro por recurso
+            ofrezco = {"oro": min(precio, oro)}
+            pido = {recurso_pido: cantidad_pido}
         elif excedentes:
-            recurso_vendo = list(excedentes.keys())[0]
-            cantidad_vendo = excedentes[recurso_vendo]
-            
-            return {
-                "asunto": f"Vendo {recurso_vendo}",
-                "cuerpo": f"Hola {destinatario}! Tengo {cantidad_vendo} {recurso_vendo} disponible. "
-                         f"¿Te interesa? Acepto oro. Saludos!"
-            }
-        
-        # Fallback
+            # Vender excedentes por oro
+            recurso_ofrezco = list(excedentes.keys())[0]
+            cantidad_ofrezco = min(excedentes[recurso_ofrezco], 3)
+            ofrezco = {recurso_ofrezco: cantidad_ofrezco}
+            pido = {"oro": cantidad_ofrezco}
+        else:
+            return None
+
+        ofrezco_str = ", ".join(f"{c} {r}" for r, c in ofrezco.items())
+        pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
+
+        cuerpo = (
+            f"Hola {destinatario}! Te propongo un intercambio:\n"
+            f"[OFREZCO] {ofrezco_str}\n"
+            f"[PIDO] {pido_str}\n"
+            f"Si te interesa, responde con [ACEPTO]. Saludos, {self.alias}"
+        )
+
         return {
-            "asunto": "Propuesta de colaboración",
-            "cuerpo": f"Hola {destinatario}! ¿Qué recursos tienes disponibles? Podemos negociar. Saludos!"
+            "asunto": f"Intercambio: mi {ofrezco_str} por tu {pido_str}",
+            "cuerpo": cuerpo,
+            "_ofrezco": ofrezco,
+            "_pido": pido,
         }
     
     # =========================================================================
@@ -370,26 +379,69 @@ Responde SOLO en este formato JSON:
     
     def _responder_aceptacion(self, remitente: str, mensaje_original: str) -> bool:
         """Responde a una aceptación enviando los recursos acordados."""
-        
+
         # Buscar si tenemos un acuerdo pendiente con esta persona
         if remitente in self.acuerdos_pendientes:
             acuerdo = self.acuerdos_pendientes[remitente]
             recursos_a_enviar = acuerdo.get('recursos_dar', {})
-            
+
             if recursos_a_enviar:
-                self._log("DECISION", f"Ejecutando acuerdo con {remitente}", {
-                    "recursos": recursos_a_enviar
-                })
-                
+                self._log("DECISION", f"Ejecutando acuerdo con {remitente}: envío {recursos_a_enviar}")
+
+                # Refrescar estado para comprobar que aún tenemos los recursos
+                self._actualizar_estado()
+
                 if self._enviar_paquete(remitente, recursos_a_enviar):
                     del self.acuerdos_pendientes[remitente]
                     return True
-        
-        # Si no hay acuerdo previo, extraer del mensaje qué debemos enviar
-        # Esto es más complejo - por ahora solo confirmamos
-        self._log("INFO", f"Aceptación de {remitente} sin acuerdo previo registrado")
-        
+                else:
+                    self._log("ERROR", f"No se pudo enviar paquete a {remitente}")
+
+        self._log("INFO", f"Aceptación de {remitente} sin acuerdo pendiente registrado")
         return False
+
+    def _parsear_oferta_estructurada(self, mensaje: str) -> Optional[Dict]:
+        """
+        Parsea etiquetas [OFREZCO] y [PIDO] de un mensaje.
+
+        Returns:
+            {"ofrecen": {"recurso": cant}, "piden": {"recurso": cant}} o None
+        """
+        ofrecen = {}
+        piden = {}
+
+        # Buscar [OFREZCO] ... y [PIDO] ...
+        ofrezco_match = re.search(r'\[OFREZCO\]\s*(.+?)(?:\n|\[|$)', mensaje, re.IGNORECASE)
+        pido_match = re.search(r'\[PIDO\]\s*(.+?)(?:\n|\[|$)', mensaje, re.IGNORECASE)
+
+        if not ofrezco_match or not pido_match:
+            return None
+
+        # Parsear "3 madera, 2 oro" etc.
+        patron = r'(\d+)\s+(\w+)'
+        for cant, recurso in re.findall(patron, ofrezco_match.group(1)):
+            ofrecen[recurso.lower()] = int(cant)
+        for cant, recurso in re.findall(patron, pido_match.group(1)):
+            piden[recurso.lower()] = int(cant)
+
+        if ofrecen and piden:
+            return {"ofrecen": ofrecen, "piden": piden}
+        return None
+
+    def _evaluar_oferta(self, ofrecen: Dict[str, int], piden: Dict[str, int],
+                        necesidades: Dict, excedentes: Dict) -> bool:
+        """
+        Decide si aceptar una oferta basándose en necesidades/excedentes.
+        Acepta si lo que nos ofrecen es algo que necesitamos y lo que
+        nos piden es algo que nos sobra.
+        """
+        # ¿Nos ofrecen algo que necesitamos?
+        nos_ayuda = any(r in necesidades for r in ofrecen)
+        # ¿Nos piden algo que nos sobra o podemos permitirnos?
+        mis_recursos = self.info_actual.get('Recursos', {}) if self.info_actual else {}
+        podemos_dar = all(mis_recursos.get(r, 0) >= c for r, c in piden.items())
+
+        return nos_ayuda and podemos_dar
     
     # =========================================================================
     # LOOP PRINCIPAL DEL AGENTE
@@ -398,89 +450,130 @@ Responde SOLO en este formato JSON:
     def _procesar_buzon(self, necesidades: Dict, excedentes: Dict) -> int:
         """
         Procesa todas las cartas del buzón.
-        
+
+        Flujo:
+        - Carta con [OFREZCO]/[PIDO]: evaluar y si conviene → enviar paquete + responder [ACEPTO]
+        - Carta con [ACEPTO]: buscar acuerdo pendiente → enviar nuestro paquete
+        - Otra carta: analizar con IA (fallback)
+
         Returns:
             Número de intercambios realizados
         """
         buzon = self.info_actual.get('Buzon', {}) if self.info_actual else {}
         intercambios = 0
-        
+        cartas_procesadas = []
+
         for uid, carta in buzon.items():
-            # Solo cartas para nosotros
-            if carta.get('dest') != self.alias:
-                continue
-            
             remitente = carta.get('remi', 'Desconocido')
             mensaje = carta.get('cuerpo', '')
             asunto = carta.get('asunto', '')
-            
+
             self._log("RECEPCION", f"Carta de {remitente}", {
                 "asunto": asunto,
-                "mensaje": mensaje[:100] + "..." if len(mensaje) > 100 else mensaje
+                "cuerpo": mensaje[:150]
             })
-            
+
             # Ignorar lista negra
             if remitente in self.lista_negra:
                 self._log("ALERTA", f"Ignorando {remitente} (lista negra)")
+                cartas_procesadas.append(uid)
                 continue
-            
+
             # Detectar robo
             if self._es_intento_robo(mensaje, remitente):
+                cartas_procesadas.append(uid)
                 continue
-            
-            # Detectar aceptación
-            if self._es_aceptacion(mensaje):
+
+            # ── Caso 1: mensaje con [ACEPTO] → ejecutar acuerdo pendiente ──
+            if '[ACEPTO]' in mensaje.upper() or self._es_aceptacion(mensaje):
                 self._log("ANALISIS", f"{remitente} ACEPTA intercambio")
-                
                 if self._responder_aceptacion(remitente, mensaje):
                     intercambios += 1
+                cartas_procesadas.append(uid)
                 continue
-            
-            # Analizar oferta
+
+            # ── Caso 2: propuesta estructurada con [OFREZCO]/[PIDO] ──
+            oferta = self._parsear_oferta_estructurada(mensaje)
+            if oferta:
+                ofrecen = oferta['ofrecen']  # lo que el otro nos da
+                piden = oferta['piden']      # lo que el otro nos pide
+
+                self._log("ANALISIS", f"Propuesta de {remitente}", {
+                    "nos_ofrecen": ofrecen,
+                    "nos_piden": piden
+                })
+
+                if self._evaluar_oferta(ofrecen, piden, necesidades, excedentes):
+                    # ¡Aceptamos! Enviar lo que nos piden
+                    self._log("DECISION", f"ACEPTO oferta de {remitente}, envío {piden}")
+                    if self._enviar_paquete(remitente, piden):
+                        # Confirmar con carta
+                        self._enviar_carta(
+                            remitente,
+                            f"Re: {asunto}",
+                            f"[ACEPTO] Trato hecho! Te envié {piden}. Espero mis {ofrecen}. Saludos, {self.alias}"
+                        )
+                        intercambios += 1
+                    else:
+                        self._log("ERROR", f"No pude enviar paquete a {remitente}")
+                else:
+                    self._log("DECISION", f"RECHAZO oferta de {remitente}")
+                    self._enviar_carta(
+                        remitente,
+                        f"Re: {asunto}",
+                        f"No me interesa ese intercambio por ahora. Saludos, {self.alias}"
+                    )
+
+                cartas_procesadas.append(uid)
+                continue
+
+            # ── Caso 3: mensaje libre → análisis con IA ──
             analisis = self._analizar_oferta_con_ia(remitente, mensaje, necesidades, excedentes)
-            
-            self._log("ANALISIS", f"Oferta de {remitente}", {
+            self._log("ANALISIS", f"IA analizó carta de {remitente}", {
                 "aceptar": analisis.get('aceptar'),
                 "razon": analisis.get('razon')
             })
-            
-            if analisis.get('aceptar'):
-                # Guardar acuerdo pendiente
-                self.acuerdos_pendientes[remitente] = {
-                    "recursos_dar": analisis.get('recursos_dar', {}),
-                    "recursos_pedir": analisis.get('recursos_pedir', {}),
-                    "timestamp": time.time()
-                }
-                
-                # Enviar aceptación
-                self._enviar_carta(
-                    remitente,
-                    f"Re: {asunto}",
-                    f"¡Acepto tu propuesta! Envío los recursos acordados. Saludos, {self.alias}"
-                )
-        
+            cartas_procesadas.append(uid)
+
+        # Limpiar buzón de cartas procesadas
+        for uid in cartas_procesadas:
+            self.api.eliminar_carta(uid)
+
         return intercambios
     
     def _enviar_propuestas(self, necesidades: Dict, excedentes: Dict, oro: int):
-        """Envía propuestas a jugadores no contactados."""
+        """Envía propuestas estructuradas a jugadores no contactados."""
         jugadores = self._obtener_jugadores_disponibles()
-        
+
         # Filtrar ya contactados esta ronda
         jugadores = [j for j in jugadores if j not in self.contactados_esta_ronda]
-        
+
         if not jugadores:
             self._log("INFO", "No hay jugadores a quienes enviar propuestas esta ronda")
             return
-        
-        # Limitar a 5 por ronda para no saturar
-        jugadores = jugadores[:5]
-        
+
+        # Limitar a 3 por ronda para no saturar
+        jugadores = jugadores[:3]
+
         for jugador in jugadores:
             propuesta = self._generar_propuesta(jugador, necesidades, excedentes, oro)
-            
+
+            if propuesta is None:
+                self._log("INFO", f"No se generó propuesta para {jugador}")
+                continue
+
             if self._enviar_carta(jugador, propuesta['asunto'], propuesta['cuerpo']):
                 self.contactados_esta_ronda.append(jugador)
-            
+
+                # Guardar acuerdo pendiente: cuando nos digan [ACEPTO],
+                # nosotros enviamos lo que ofrecimos (_ofrezco)
+                self.acuerdos_pendientes[jugador] = {
+                    "recursos_dar": propuesta['_ofrezco'],
+                    "recursos_pedir": propuesta['_pido'],
+                    "timestamp": time.time()
+                }
+                self._log("INFO", f"Acuerdo pendiente con {jugador}: dar={propuesta['_ofrezco']}, pedir={propuesta['_pido']}")
+
             time.sleep(self.pausa_entre_acciones)
     
     def _ejecutar_ronda(self) -> bool:

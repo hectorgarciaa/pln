@@ -27,7 +27,7 @@ from pathlib import Path
 
 # ─── Configuración por defecto ───────────────────────────────────────────────
 DEFAULT_N = 3
-DEFAULT_MODELO = "qwen3-vl:8b"
+DEFAULT_MODELO = "qwen3:8b"
 DEFAULT_MAX_RONDAS = 10
 DEFAULT_PAUSA = 30
 DEFAULT_PREFIJO = "Bot"
