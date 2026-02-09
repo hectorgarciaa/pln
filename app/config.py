@@ -30,6 +30,12 @@ OLLAMA_PARAMS = {
     "stop": ["\n\n", "---"],
 }
 
+# Control de pensamiento para modelos qwen3
+# Máx. segundos que se permite al modelo "pensar" (bloques <think>)
+THINK_TIMEOUT = 10
+# Si True, desactiva el pensamiento en modelos que lo soportan (añade /no_think)
+DISABLE_THINK = False
+
 # Recursos conocidos en el juego (usado para generar propuestas)
 RECURSOS_CONOCIDOS = [
     'oro', 'madera', 'piedra', 'comida', 'hierro', 'trigo',
