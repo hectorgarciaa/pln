@@ -1,0 +1,30 @@
+# --- Caché y ejecución de Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.python-version
+
+# --- Entornos Virtuales ---
+# En tu imagen se ve la carpeta .venv, es fundamental ignorarla
+.venv/
+venv/
+env/
+
+# --- Gestión de dependencias (uv / pip) ---
+# Ignoramos uv.lock si prefieres que cada entorno lo genere, 
+# aunque en proyectos finales se suele subir. Por ahora lo dejamos fuera si es desarrollo local.
+# uv.lock 
+
+# --- Logs y Datos temporales ---
+# He visto que tienes una carpeta 'app/logs', mejor que no suba tus trazas
+app/logs/
+*.log
+
+# --- Archivos de configuración de IDE ---
+.vscode/
+.idea/
+
+# --- Archivos del sistema ---
+.DS_Store
+Thumbs.db
