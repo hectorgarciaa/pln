@@ -30,7 +30,7 @@ OLLAMA_PARAMS = {
     "stop": ["\n\n", "---"],
 }
 
-# Recursos conocidos en el juego
+# Recursos conocidos en el juego (usado para generar propuestas)
 RECURSOS_CONOCIDOS = [
     'oro', 'madera', 'piedra', 'comida', 'hierro', 'trigo',
     'carbon', 'agua', 'plata', 'cobre', 'diamante', 'lana',
@@ -39,20 +39,5 @@ RECURSOS_CONOCIDOS = [
     'verdura', 'sal', 'azucar', 'miel', 'vino', 'cerveza'
 ]
 
-# Detección de robos
-PALABRAS_SOSPECHOSAS = [
-    'gratis', 'regalo', 'error del sistema', 'bug', 'primero',
-    'confía', 'urgente ahora', 'última oportunidad', 'solo hoy',
-    'envía ya', 'transfiero después', 'prometo'
-]
-
-PALABRAS_ACEPTACION = [
-    'acepto', 'trato hecho', 'de acuerdo', 'ok', 'vale', 'perfecto',
-    'hecho', 'me parece bien', 'aceptado', 'sí', 'claro', 'por supuesto',
-    'enviado', 'te envío', 'ahí va', 'recibido', 'gracias por'
-]
-
-PALABRAS_RECHAZO = [
-    'no acepto', 'no me interesa', 'no gracias', 'rechazo', 'no puedo',
-    'muy caro', 'demasiado', 'no tengo', 'no quiero'
-]
+# NOTA: La detección de estafas, aceptaciones y rechazos se hace
+# completamente mediante el modelo de IA (Ollama), sin listas de palabras.
