@@ -12,9 +12,10 @@ MODELOS_DISPONIBLES = {
     "2": ("qwen3-vl:8b", "⚡⚡ Balance (5-10s)"),
     "3": ("qwen2.5:7b", "⚡ Calidad (10-15s)"),
     "4": ("phi3:mini", "⚡⚡⚡ Muy rápido (3-5s)"),
+    "5": ("qwen3:8b", "solo Texto"),
 }
 
-MODELO_DEFAULT = "qwen3-vl:8b"
+MODELO_DEFAULT = "qwen3:8b"
 
 # Parámetros de Ollama optimizados para velocidad
 OLLAMA_PARAMS = {
