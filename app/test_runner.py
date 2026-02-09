@@ -26,7 +26,7 @@ from datetime import datetime
 from pathlib import Path
 
 # ─── Configuración por defecto ───────────────────────────────────────────────
-DEFAULT_N = 1
+DEFAULT_N = 3
 DEFAULT_MODELO = "qwen3-vl:8b"
 DEFAULT_MAX_RONDAS = 10
 DEFAULT_PAUSA = 30
@@ -53,7 +53,8 @@ def crear_directorio_logs():
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def construir_comando(alias: str, args: argparse.Namespace) -> list[str]:
+def construir_comando(alias: str, args: argparse.Namespace,
+                      source_ip: str = None) -> list[str]:
     """Construye la lista de argumentos para lanzar un bot."""
     cmd = [
         sys.executable, str(MAIN_SCRIPT),
@@ -64,6 +65,8 @@ def construir_comando(alias: str, args: argparse.Namespace) -> list[str]:
     ]
     if args.debug:
         cmd.append("--debug")
+    if source_ip:
+        cmd.extend(["--source-ip", source_ip])
     return cmd
 
 
@@ -80,11 +83,12 @@ def lanzar_modo_logs(aliases: list[str], args: argparse.Namespace):
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
 
-    for alias in aliases:
+    for i, alias in enumerate(aliases):
+        source_ip = f"127.0.0.{i + 1}"
         log_path = LOGS_DIR / f"{alias}_{timestamp}.log"
         log_file = open(log_path, "w", encoding="utf-8")
 
-        cmd = construir_comando(alias, args)
+        cmd = construir_comando(alias, args, source_ip=source_ip)
         proc = subprocess.Popen(
             cmd,
             stdout=log_file,
@@ -127,8 +131,9 @@ def lanzar_modo_consola(aliases: list[str], args: argparse.Namespace):
             stream.close()
 
     for i, alias in enumerate(aliases):
+        source_ip = f"127.0.0.{i + 1}"
         color = COLORES[i % len(COLORES)]
-        cmd = construir_comando(alias, args)
+        cmd = construir_comando(alias, args, source_ip=source_ip)
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -230,13 +235,6 @@ def parse_args():
 def main():
     args = parse_args()
     aliases = [f"{args.prefijo}_{i}" for i in range(1, args.n + 1)]
-
-    if args.n > 1:
-        print("\n" + "⚠" * 30)
-        print("⚠  ADVERTENCIA: La API del juego solo soporta 1 alias activo")
-        print("   por cuenta. Lanzar múltiples bots hará que se sobreescriban")
-        print("   mutuamente. Se recomienda usar -n 1 (por defecto).")
-        print("⚠" * 30 + "\n")
 
     print("=" * 60)
     print("🚀 ORQUESTADOR DE BOTS NEGOCIADORES")

@@ -4,15 +4,32 @@ Centraliza todas las llamadas HTTP.
 """
 
 import requests
+from requests.adapters import HTTPAdapter
 from typing import Dict, List, Optional
 from config import API_BASE_URL
+
+
+class SourceIPAdapter(HTTPAdapter):
+    """HTTPAdapter que bindea a una IP local específica."""
+    def __init__(self, source_ip: str, **kwargs):
+        self.source_ip = source_ip
+        super().__init__(**kwargs)
+
+    def init_poolmanager(self, *args, **kwargs):
+        kwargs["source_address"] = (self.source_ip, 0)
+        super().init_poolmanager(*args, **kwargs)
 
 
 class APIClient:
     """Cliente para interactuar con la API del juego."""
     
-    def __init__(self):
-        self.base_url = API_BASE_URL
+    def __init__(self, base_url: str = None, source_ip: str = None):
+        self.base_url = base_url or API_BASE_URL
+        self.session = requests.Session()
+        if source_ip:
+            adapter = SourceIPAdapter(source_ip)
+            self.session.mount("http://", adapter)
+            self.session.mount("https://", adapter)
     
     # =========================================================================
     # INFORMACIÓN
@@ -21,7 +38,7 @@ class APIClient:
     def get_info(self) -> Optional[Dict]:
         """Obtiene información general del jugador."""
         try:
-            response = requests.get(f"{self.base_url}/info")
+            response = self.session.get(f"{self.base_url}/info")
             if response.status_code == 200:
                 return response.json()
             print(f"⚠ Error obteniendo info: {response.status_code}")
@@ -33,7 +50,7 @@ class APIClient:
     def get_gente(self) -> List[str]:
         """Obtiene lista de personas disponibles."""
         try:
-            response = requests.get(f"{self.base_url}/gente")
+            response = self.session.get(f"{self.base_url}/gente")
             if response.status_code == 200:
                 return response.json()
             print(f"⚠ Error obteniendo gente: {response.status_code}")
@@ -49,7 +66,7 @@ class APIClient:
     def crear_alias(self, nombre: str) -> bool:
         """Crea un nuevo alias."""
         try:
-            response = requests.post(f"{self.base_url}/alias/{nombre}")
+            response = self.session.post(f"{self.base_url}/alias/{nombre}")
             if response.status_code == 200:
                 print(f"✓ Alias '{nombre}' creado")
                 return True
@@ -62,7 +79,7 @@ class APIClient:
     def eliminar_alias(self, nombre: str) -> bool:
         """Elimina un alias."""
         try:
-            response = requests.delete(f"{self.base_url}/alias/{nombre}")
+            response = self.session.delete(f"{self.base_url}/alias/{nombre}")
             if response.status_code == 200:
                 print(f"✓ Alias '{nombre}' eliminado")
                 return True
@@ -90,7 +107,7 @@ class APIClient:
         }
         
         try:
-            response = requests.post(f"{self.base_url}/carta", json=carta_data)
+            response = self.session.post(f"{self.base_url}/carta", json=carta_data)
             if response.status_code == 200:
                 return True
             print(f"⚠ Error enviando carta: {response.status_code}")
@@ -102,7 +119,7 @@ class APIClient:
     def eliminar_carta(self, uid: str) -> bool:
         """Elimina una carta del buzón."""
         try:
-            response = requests.delete(f"{self.base_url}/mail/{uid}")
+            response = self.session.delete(f"{self.base_url}/mail/{uid}")
             return response.status_code == 200
         except requests.RequestException as e:
             print(f"⚠ Error eliminando carta: {e}")
@@ -115,9 +132,8 @@ class APIClient:
     def enviar_paquete(self, destinatario: str, recursos: Dict[str, int]) -> bool:
         """Envía un paquete de recursos a otro jugador."""
         try:
-            response = requests.post(
-                f"{self.base_url}/paquete",
-                params={"dest": destinatario},
+            response = self.session.post(
+                f"{self.base_url}/paquete/{destinatario}",
                 json=recursos
             )
             if response.status_code == 200:

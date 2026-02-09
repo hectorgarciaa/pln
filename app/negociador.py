@@ -77,9 +77,10 @@ class AgenteNegociador:
         agente.ejecutar()  # Corre hasta completar objetivo
     """
     
-    def __init__(self, alias: str, modelo: str = MODELO_DEFAULT, debug: bool = False):
+    def __init__(self, alias: str, modelo: str = MODELO_DEFAULT, debug: bool = False,
+                 api_url: str = None, source_ip: str = None):
         self.alias = alias
-        self.api = APIClient()
+        self.api = APIClient(base_url=api_url, source_ip=source_ip)
         self.ia = OllamaClient(modelo)
         self.debug = debug
         

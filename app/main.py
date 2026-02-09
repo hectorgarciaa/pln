@@ -64,7 +64,8 @@ def menu_agente(alias: str):
 
 
 def _ejecutar_agente(alias: str, modelo: str, debug: bool,
-                     max_rondas: int, pausa: int, interactivo: bool = False):
+                     max_rondas: int, pausa: int, interactivo: bool = False,
+                     source_ip: str = None, api_url: str = None):
     """
     Crea y ejecuta el agente negociador.
 
@@ -75,8 +76,10 @@ def _ejecutar_agente(alias: str, modelo: str, debug: bool,
         max_rondas: Máximo de rondas.
         pausa: Segundos entre rondas.
         interactivo: Si True, muestra menú post-ejecución.
+        source_ip: IP local de origen para diferenciar jugadores en el butler.
+        api_url: URL base de la API del juego.
     """
-    agente = AgenteNegociador(alias, modelo, debug)
+    agente = AgenteNegociador(alias, modelo, debug, api_url=api_url, source_ip=source_ip)
     agente.pausa_entre_rondas = pausa
     
     try:
@@ -241,6 +244,14 @@ Ejemplos:
         "--pausa", type=int, default=30,
         help="Segundos de espera entre rondas (default: 30)"
     )
+    parser.add_argument(
+        "--source-ip", type=str, default=None,
+        help="IP local de origen para el butler (default: None = sin bind)"
+    )
+    parser.add_argument(
+        "--api-url", type=str, default=None,
+        help="URL base de la API del juego (default: config.API_BASE_URL)"
+    )
     return parser.parse_args()
 
 
@@ -258,6 +269,8 @@ def main():
             max_rondas=args.max_rondas,
             pausa=args.pausa,
             interactivo=False,
+            source_ip=args.source_ip,
+            api_url=args.api_url,
         )
         return
 
