@@ -1,5 +1,5 @@
 Tu alias para negociar: AmarNoEsDelito
-───────────────────────── 🤖 Configuración del Agente ──────────────────────────
+────────────────────────────────────────── 🤖 Configuración del Agente ───────────────────────────────────────────
               Modelos disponibles               
 ┏━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
 ┃ # ┃ Modelo      ┃ Descripción                ┃
@@ -24,7 +24,7 @@ Segundos entre rondas (30): 30
 └──────────────┴──────────────────┘
 
 ¿Iniciar agente? [y/n] (y): y
-2026-02-10 16:33:56.546 | INFO     | negociador:__init__:228 - Logs guardados en /home/hlocal/Documents/pln/pln/app/logs/AmarNoEsDelito.log
+2026-02-10 16:47:23.164 | INFO     | negociador:__init__:228 - Logs guardados en /home/hlocal/Documents/pln/pln/app/logs/AmarNoEsDelito.log
 ╭───────────────────────────────╮
 │ 🤖 AGENTE NEGOCIADOR AUTÓNOMO │
 │                               │
@@ -33,80 +33,62 @@ Segundos entre rondas (30): 30
 │   Debug:      ACTIVADO        │
 │   Max rondas: 20              │
 ╰───────────────────────────────╯
-2026-02-10 16:33:56.550 | ERROR    | api_client:crear_alias:83 - Error de conexión (crear alias): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /alias/AmarNoEsDelito (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:47:23.170 | WARNING  | api_client:crear_alias:80 - Error creando alias: status 403
 ⚠ No se pudo crear el alias 'AmarNoEsDelito', puede que ya exista.
 
 🔄 RONDA 1/20
-───────────────────── 📍 RONDA — Modo: conseguir_objetivo ──────────────────────
-2026-02-10 16:33:56.553 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
-2026-02-10 16:33:56.554 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
-2026-02-10 16:33:56.554 | ERROR    | negociador:_ejecutar_ronda:1081 - ❌ [ERROR] No se pudo conectar a la API
-  ❌ [ERROR] No se pudo conectar a la API
-
-⏳ Esperando 30s para respuestas…
-
-🔄 RONDA 2/20
 ────────────────────────────────────── 📍 RONDA — Modo: conseguir_objetivo ───────────────────────────────────────
-2026-02-10 16:34:26.558 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
-2026-02-10 16:34:26.559 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
-2026-02-10 16:34:26.560 | ERROR    | negociador:_ejecutar_ronda:1081 - ❌ [ERROR] No se pudo conectar a la API
-  ❌ [ERROR] No se pudo conectar a la API
-
-⏳ Esperando 30s para respuestas…
-^C
-
-⏹️ Agente detenido por el usuario
-2026-02-10 16:34:41.072 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
-2026-02-10 16:34:41.074 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
-
-       📊 Resumen de Ejecución        
-┌───────────────────┬────────────────┐
-│  💰 Oro final     │  0             │
-│  🎯 Objetivo      │  ❌ PENDIENTE  │
-│  🔄 Intercambios  │  0             │
-│  🛡️ Lista negra   │  0             │
-└───────────────────┴────────────────┘
-─────────────────────────────────────────── 📜 Opciones post-ejecución ───────────────────────────────────────────
-1. Ver log (loguru)
-2. Ver lista negra
-3. Continuar ejecución
-0. Salir
-Opción [0/1/2/3] (0): 0
-
-1. 🤖 INICIAR AGENTE AUTÓNOMO
-2. 📡 Operaciones API (manual)
-0. Salir
-
-Opción [0/1/2] (1): 2
-────────────────────────────────────────── 📡 Operaciones API (manual) ───────────────────────────────────────────
-1. Ver mi información
-2. Ver jugadores
-3. Crear alias
-4. Eliminar alias
-5. Enviar carta
-6. Enviar paquete
-7. Eliminar carta
-0. Volver
-Opción [0/1/2/3/4/5/6/7] (0): 1
-2026-02-10 16:34:54.175 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
-────────────────────────────────────────── 📡 Operaciones API (manual) ───────────────────────────────────────────
-1. Ver mi información
-2. Ver jugadores
-3. Crear alias
-4. Eliminar alias
-5. Enviar carta
-6. Enviar paquete
-7. Eliminar carta
-0. Volver
-Opción [0/1/2/3/4/5/6/7] (0): 1
-2026-02-10 16:34:59.471 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
-────────────────────────────────────────── 📡 Operaciones API (manual) ───────────────────────────────────────────
-1. Ver mi información
-2. Ver jugadores
-3. Crear alias
-4. Eliminar alias
-5. Enviar carta
-6. Enviar paquete
-7. Eliminar carta
-0. Volver
-Opción [0/1/2/3/4/5/6/7] (0): 
+2026-02-10 16:47:23.178 | DEBUG    | negociador:_ejecutar_ronda:1089 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+  ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': 
+{'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:47:23.179 | DEBUG    | negociador:_ejecutar_ronda:1105 - ℹ️ [INFO] Procesando buzón…
+  ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:47:23.179 | DEBUG    | negociador:_procesar_buzon:874 - 📥 [RECEPCION] Carta de a | {'asunto': 'Oferta de trueque', 'mensaje': 'Hola, tengo estos recursos de sobra:\n- ladrillos: 1\n- piedra: 4\n- tela: 4\n- oro: 8\n- arroz: 1\n'}
+  📥 [RECEPCION] Carta de a | {'asunto': 'Oferta de trueque', 'mensaje': 'Hola, tengo estos recursos de sobra:\n- 
+ladrillos: 1\n- piedra: 4\n- tela: 4\n- oro: 8\n- arroz: 1\n'}
+2026-02-10 16:47:29.327 | DEBUG    | negociador:_analizar_mensaje:366 - • [DEBUG] IA unificada: {'es_aceptacion': False, 'es_estafa': False, 'ofrecen': {}, 'piden': {}, 'razon': 'Mensaje de anuncio de recursos sin propuesta de intercambio'}
+  • [DEBUG] IA unificada: {'es_aceptacion': False, 'es_estafa': False, 'ofrecen': {}, 'piden': {}, 'razon': 
+'Mensaje de anuncio de recursos sin propuesta de intercambio'}
+2026-02-10 16:47:29.328 | DEBUG    | negociador:_procesar_buzon:931 - 🔍 [ANALISIS] Carta de a analizada | {'ofrecen': {}, 'piden': {}, 'aceptar': False, 'razon': 'oferta incompleta (falta ofrecen o piden)'}
+  🔍 [ANALISIS] Carta de a analizada | {'ofrecen': {}, 'piden': {}, 'aceptar': False, 'razon': 'oferta incompleta 
+(falta ofrecen o piden)'}
+2026-02-10 16:47:29.329 | DEBUG    | negociador:_procesar_buzon:1016 - ℹ️ [INFO] Mensaje de a sin propuesta clara: oferta incompleta (falta ofrecen o piden)
+  ℹ️ [INFO] Mensaje de a sin propuesta clara: oferta incompleta (falta ofrecen o piden)
+2026-02-10 16:47:29.334 | DEBUG    | negociador:_ejecutar_ronda:1116 - ℹ️ [INFO] Enviando propuestas…
+  ℹ️ [INFO] Enviando propuestas…
+Traceback (most recent call last):
+  File "/home/hlocal/Documents/pln/pln/app/main.py", line 266, in <module>
+    main()
+  File "/home/hlocal/Documents/pln/pln/.venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hlocal/Documents/pln/pln/.venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/home/hlocal/Documents/pln/pln/.venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hlocal/Documents/pln/pln/.venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+    return callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hlocal/Documents/pln/pln/app/main.py", line 84, in main
+    _menu_agente(alias)
+  File "/home/hlocal/Documents/pln/pln/app/main.py", line 136, in _menu_agente
+    _ejecutar_agente(alias, modelo, debug, max_rondas, pausa, interactivo=True)
+  File "/home/hlocal/Documents/pln/pln/app/main.py", line 151, in _ejecutar_agente
+    agente.ejecutar(max_rondas)
+  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 1155, in ejecutar
+    completado = self._ejecutar_ronda()
+                 ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 1117, in _ejecutar_ronda
+    self._enviar_propuestas(necesidades, excedentes, estado["oro"])
+  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 1035, in _enviar_propuestas
+    propuesta = self._generar_propuesta(jugador, necesidades, excedentes, oro)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 439, in _generar_propuesta
+    if self._rechazo_vigente(clave):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 408, in _rechazo_vigente
+    if clave not in self.rechazos_recibidos:
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: unhashable type: 'dict'
