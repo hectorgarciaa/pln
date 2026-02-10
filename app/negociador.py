@@ -316,49 +316,60 @@ class AgenteNegociador:
             self._log("ERROR", f"Respuesta IA inválida (aceptación): {e}")
             return False
 
-    def _extraer_ofrecen_piden_regex(self, texto: str) -> Optional[RespuestaAnalisis]:
-        """Fallback: extrae [OFREZCO] y [PIDO] con regex si la IA falla."""
-        ofrecen: Dict[str, int] = {}
-        piden: Dict[str, int] = {}
+    def _decidir_aceptar_programatico(self, ofrecen: Dict[str, int],
+                                       piden: Dict[str, int],
+                                       necesidades: Dict, excedentes: Dict) -> tuple:
+        """Decide si aceptar con lógica determinista. Devuelve (bool, str)."""
+        if not ofrecen or not piden:
+            return False, "oferta incompleta (falta ofrecen o piden)"
 
-        patron = _re.compile(r'\[(OFREZCO|PIDO)\]\s*(\d+)\s+(\w+)', _re.IGNORECASE)
-        for match in patron.finditer(texto):
-            tipo, cant, recurso = match.group(1).upper(), int(match.group(2)), match.group(3).lower()
-            if tipo == "OFREZCO":
-                ofrecen[recurso] = int(cant)
-            else:
-                piden[recurso] = int(cant)
+        me_ofrecen_lo_que_necesito = any(r in necesidades for r in ofrecen)
+        piden_solo_excedentes = all(
+            r in excedentes and excedentes[r] >= c
+            for r, c in piden.items() if c > 0
+        )
 
-        if ofrecen or piden:
-            return RespuestaAnalisis(ofrecen=ofrecen, piden=piden, razon="extraído con regex")
-        return None
+        if me_ofrecen_lo_que_necesito and piden_solo_excedentes:
+            return True, "ofrecen lo que necesito y piden lo que me sobra"
+        if not me_ofrecen_lo_que_necesito:
+            return False, "no ofrecen nada de lo que necesito"
+        return False, "piden recursos que no me sobran o no tengo suficientes"
 
     def _analizar_mensaje_completo(self, remitente: str, mensaje: str,
                                    necesidades: Dict, excedentes: Dict) -> RespuestaAnalisis:
-        """Analiza completamente un mensaje con IA y devuelve modelo validado.
+        """Analiza un mensaje con IA y devuelve modelo validado.
 
-        Si la IA falla, intenta extraer [OFREZCO]/[PIDO] con regex.
+        Flujo:
+        1. La IA EXTRAE ofrecen/piden del mensaje (no decide nada)
+        2. _decidir_aceptar_programatico() decide si aceptar
         """
         mis_recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+        recursos_validos = list(mis_recursos.keys()) if mis_recursos else RECURSOS_CONOCIDOS
 
         prompt = (
-            f'Eres un asistente de un juego de intercambio de recursos.\n'
-            f'Analiza este mensaje y extrae la información de intercambio.\n\n'
-            f'MENSAJE DE "{remitente}":\n"{mensaje}"\n\n'
-            f'MI SITUACIÓN:\n'
-            f'- Recursos que tengo: {json.dumps(mis_recursos)}\n'
-            f'- Recursos que NECESITO: {json.dumps(necesidades)}\n'
-            f'- Recursos que me SOBRAN: {json.dumps(excedentes)}\n\n'
-            f'INSTRUCCIONES:\n'
-            f'1. Busca las etiquetas [OFREZCO] y [PIDO] en el mensaje.\n'
-            f'2. Extrae qué recursos y cantidades OFRECE el remitente.\n'
-            f'3. Extrae qué recursos y cantidades PIDE el remitente.\n'
-            f'4. Acepta SOLO si me ofrecen algo que necesito Y piden algo que me sobra.\n\n'
-            f'EJEMPLO de respuesta correcta:\n'
-            f'{{"ofrecen": {{"piedra": 4}}, "piden": {{"queso": 3}}, '
-            f'"aceptar": false, "razon": "no necesito piedra", '
-            f'"contraoferta": false, "contraoferta_dar": {{}}, "contraoferta_pedir": {{}}}}\n\n'
-            f'Responde ÚNICAMENTE con el JSON, sin texto adicional.'
+            f'Eres un analizador de mensajes en un juego de intercambio de recursos.\n'
+            f'Tu ÚNICA tarea es EXTRAER datos del mensaje, NO inventarlos.\n\n'
+            f'───── MENSAJE DE "{remitente}" ─────\n'
+            f'{mensaje}\n'
+            f'───── FIN DEL MENSAJE ─────\n\n'
+            f'RECURSOS VÁLIDOS en este juego: {json.dumps(recursos_validos)}\n\n'
+            f'REGLAS ESTRICTAS:\n'
+            f'1. "ofrecen" = lo que el REMITENTE ofrece DARME a mí '
+            f'(lo que yo RECIBIRÍA). Solo incluye recursos y cantidades '
+            f'que el remitente MENCIONA EXPLÍCITAMENTE en su mensaje.\n'
+            f'2. "piden" = lo que el REMITENTE quiere RECIBIR de mí '
+            f'(lo que yo DARÍA). Solo incluye recursos y cantidades '
+            f'que el remitente MENCIONA EXPLÍCITAMENTE en su mensaje.\n'
+            f'3. Si el mensaje es un RECHAZO, saludo, agradecimiento, '
+            f'o cualquier cosa que NO sea una propuesta de intercambio: '
+            f'devuelve ofrecen={{}}, piden={{}}.\n'
+            f'4. NO inventes recursos ni cantidades que no aparezcan en el texto.\n'
+            f'5. NO uses mi inventario para rellenar campos.\n'
+            f'6. Pon "aceptar": false SIEMPRE (yo decido luego).\n\n'
+            f'Responde SOLO con este JSON (sin texto antes ni después):\n'
+            f'{{"ofrecen": {{}}, "piden": {{}}, "aceptar": false, '
+            f'"razon": "breve explicación", "contraoferta": false, '
+            f'"contraoferta_dar": {{}}, "contraoferta_pedir": {{}}}}'
         )
 
         respuesta = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
@@ -366,22 +377,18 @@ class AgenteNegociador:
 
         if datos:
             try:
-                return RespuestaAnalisis(**datos)
+                # Forzar aceptar=False: la IA solo extrae, nosotros decidimos
+                datos["aceptar"] = False
+                analisis = RespuestaAnalisis(**datos)
+
+                # Decisión programática
+                aceptar, razon = self._decidir_aceptar_programatico(
+                    analisis.ofrecen, analisis.piden, necesidades, excedentes)
+                analisis.aceptar = aceptar
+                analisis.razon = razon
+                return analisis
             except ValidationError as e:
                 self._log("ERROR", f"Respuesta IA inválida (análisis): {e}")
-
-        # Fallback: extraer con regex las etiquetas [OFREZCO] / [PIDO]
-        regex_result = self._extraer_ofrecen_piden_regex(mensaje)
-        if regex_result:
-            # Decidir si aceptar usando la lógica programática
-            me_ofrecen_lo_que_necesito = any(r in necesidades for r in regex_result.ofrecen)
-            me_piden_lo_que_me_sobra = all(r in excedentes for r in regex_result.piden)
-            regex_result.aceptar = me_ofrecen_lo_que_necesito and me_piden_lo_que_me_sobra
-            regex_result.razon = ("regex: aceptable" if regex_result.aceptar
-                                   else "regex: no cumple mis necesidades")
-            self._log("INFO", f"Fallback regex para carta de {remitente}",
-                      {"ofrecen": regex_result.ofrecen, "piden": regex_result.piden})
-            return regex_result
 
         return RespuestaAnalisis(razon="No se pudo analizar el mensaje")
 
@@ -425,14 +432,14 @@ class AgenteNegociador:
         pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
 
         cuerpo = (
-            f"Hola {destinatario}! Te propongo un intercambio:\n"
-            f"[OFREZCO] {ofrezco_str}\n"
-            f"[PIDO] {pido_str}\n"
-            f"Si te interesa, responde con [ACEPTO]. Saludos, {self.alias}"
+            f"Hola {destinatario}, soy {self.alias}. "
+            f"Te propongo un intercambio: "
+            f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
+            f"¿Qué te parece? Si aceptas, dime y cerramos el trato."
         )
 
         return {
-            "asunto": f"Intercambio: mi {ofrezco_str} por tu {pido_str}",
+            "asunto": f"Propuesta: mi {ofrezco_str} por tu {pido_str}",
             "cuerpo": cuerpo,
             "_ofrezco": ofrezco,
             "_pido": pido,
@@ -465,11 +472,11 @@ class AgenteNegociador:
         pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
 
         cuerpo = (
-            f"Hola {destinatario}! Vi tu oferta pero no tengo lo que pides. "
-            f"Te hago una contrapropuesta:\n"
-            f"[OFREZCO] {ofrezco_str}\n"
-            f"[PIDO] {pido_str}\n"
-            f"Si te interesa, responde con [ACEPTO]. Saludos, {self.alias}"
+            f"Hola {destinatario}, soy {self.alias}. "
+            f"Vi tu oferta pero no tengo lo que pides. "
+            f"Te hago una contrapropuesta: "
+            f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
+            f"¿Te interesa? Dime si aceptas."
         )
 
         return {
@@ -490,11 +497,14 @@ class AgenteNegociador:
         pido_str = ", ".join(f"{c} {r}" for r, c in propuesta["_pido"].items())
 
         prompt = (
-            f"Genera un mensaje corto y amigable para proponer un intercambio.\n\n"
+            f"Genera un mensaje corto, amigable y natural para proponer un intercambio "
+            f"de recursos en un juego.\n\n"
             f"DESTINATARIO: {destinatario}\nYO SOY: {self.alias}\n"
             f"OFREZCO: {ofrezco_str}\nPIDO: {pido_str}\n\n"
-            f"El mensaje debe incluir [OFREZCO] y [PIDO] con las cantidades "
-            f"y terminar diciendo que responda con [ACEPTO].\nEscribe SOLO el mensaje."
+            f"El mensaje debe dejar MUY CLARO qué ofreces y qué pides, "
+            f"con las cantidades exactas. Escríbelo como un humano, sin etiquetas "
+            f"ni formatos especiales. Termina pidiendo confirmación.\n"
+            f"Escribe SOLO el mensaje, nada más."
         )
 
         texto = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
@@ -563,8 +573,42 @@ class AgenteNegociador:
     # LOOP PRINCIPAL
     # =====================================================================
 
+    # ── helpers de filtrado rápido (sin IA) ────────────────────────────
+    _RE_RECHAZO = _re.compile(
+        r'no me interesa|no acepto|no puedo aceptar|rechaz|no,? gracias'
+        r'|no tengo lo que|no necesito|no quiero|paso de',
+        _re.IGNORECASE,
+    )
+    _RE_PROPUESTA = _re.compile(
+        r'\b(ofrezco|te doy|te ofrezco|propongo|intercambi|cambi|pido|'
+        r'necesito|quiero|busco|doy .* por|a cambio de|\d+\s+\w+.*por)',
+        _re.IGNORECASE,
+    )
+
+    def _es_carta_sistema(self, remitente: str, mensaje: str) -> bool:
+        """Devuelve True para notificaciones del sistema (no son propuestas)."""
+        if remitente.lower() in ("sistema", "server", "butler"):
+            return True
+        if _re.match(r'(?i)^(has recibido|recursos generados|paquete|\s*$)', mensaje.strip()):
+            return True
+        return False
+
+    def _es_rechazo_simple(self, mensaje: str) -> bool:
+        """Detecta rechazos textuales sin necesidad de IA."""
+        # Si contiene alguna propuesta de intercambio, NO es rechazo simple
+        if self._RE_PROPUESTA.search(mensaje):
+            return False
+        return bool(self._RE_RECHAZO.search(mensaje))
+
+    def _es_mensaje_corto_sin_propuesta(self, mensaje: str) -> bool:
+        """Detecta mensajes muy cortos que no contienen propuesta."""
+        limpio = mensaje.strip()
+        if len(limpio) < 15:  # "ok", "gracias", "hola"
+            return not self._RE_PROPUESTA.search(limpio)
+        return False
+
     def _procesar_buzon(self, necesidades: Dict, excedentes: Dict) -> int:
-        """Procesa todas las cartas del buzón usando IA."""
+        """Procesa todas las cartas del buzón usando IA para lenguaje natural."""
         buzon = self.info_actual.get("Buzon", {}) if self.info_actual else {}
         intercambios = 0
         cartas_procesadas = []
@@ -583,44 +627,98 @@ class AgenteNegociador:
             self._log("RECEPCION", f"Carta de {remitente}",
                       {"asunto": asunto, "mensaje": mensaje[:150]})
 
+            # ── Filtro 0: cartas del Sistema → ignorar ──
+            if self._es_carta_sistema(remitente, mensaje):
+                self._log("INFO", f"Carta del sistema de '{remitente}' — ignorada")
+                cartas_procesadas.append(uid)
+                continue
+
             # ── Lista negra ──
             if remitente in self.lista_negra:
                 self._log("ALERTA", f"Ignorando {remitente} (lista negra)")
                 cartas_procesadas.append(uid)
                 continue
 
-            # ── Paso 1: ¿Estafa? ──
-            if self._es_intento_robo(mensaje, remitente):
+            # ── Filtro 1: rechazos simples → no gastar IA ──
+            if self._es_rechazo_simple(mensaje):
+                self._log("INFO", f"Rechazo de {remitente} — ignorado (sin IA)")
                 cartas_procesadas.append(uid)
                 continue
 
-            # ── Paso 2: ¿Aceptación? ──
+            # ── Filtro 2: mensajes muy cortos sin propuesta ──
+            if self._es_mensaje_corto_sin_propuesta(mensaje):
+                self._log("INFO", f"Mensaje corto de {remitente} sin propuesta — ignorado")
+                cartas_procesadas.append(uid)
+                continue
+
+            # ── Paso 1: ¿Aceptación? (IA para lenguaje natural) ──
             if self._es_aceptacion(mensaje):
-                self._log("ANALISIS", f"IA detecta que {remitente} ACEPTA intercambio")
+                self._log("ANALISIS", f"{remitente} ACEPTA intercambio")
                 if self._responder_aceptacion(remitente, mensaje):
                     intercambios += 1
                 cartas_procesadas.append(uid)
                 continue
 
-            # ── Paso 3: Análisis completo ──
-            analisis = self._analizar_mensaje_completo(remitente, mensaje, necesidades, excedentes)
+            # ── Paso 2: ¿Estafa? ──
+            if self._es_intento_robo(mensaje, remitente):
+                cartas_procesadas.append(uid)
+                continue
 
-            self._log("ANALISIS", f"IA analizó carta de {remitente}", {
+            # ── Paso 3: Análisis completo (regex fast-path + IA) ──
+            analisis = self._analizar_mensaje_completo(
+                remitente, mensaje, necesidades, excedentes)
+
+            self._log("ANALISIS", f"Carta de {remitente} analizada", {
                 "ofrecen": analisis.ofrecen, "piden": analisis.piden,
                 "aceptar": analisis.aceptar, "razon": analisis.razon,
             })
 
+            # ── Decisión: aceptar ──
             if analisis.aceptar and analisis.piden:
-                self._log("DECISION", f"ACEPTO oferta de {remitente}, envío {analisis.piden}")
-                if self._enviar_paquete(remitente, analisis.piden):
-                    self._enviar_carta(
-                        remitente, f"Re: {asunto}",
-                        f"[ACEPTO] Trato hecho! Te envié {analisis.piden}. "
-                        f"Espero mis {analisis.ofrecen}. Saludos, {self.alias}",
-                    )
-                    intercambios += 1
+                # VALIDAR antes de enviar: ¿me piden cosas que realmente me sobran?
+                self._actualizar_estado()
+                mis_recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+                # Recalcular excedentes con estado fresco
+                estado_fresco = self._actualizar_estado()
+                excedentes_frescos = estado_fresco.get("excedentes", {}) if estado_fresco else {}
+
+                envio_valido = True
+                recursos_a_enviar: Dict[str, int] = {}
+                for rec, cant in analisis.piden.items():
+                    if cant <= 0:
+                        continue
+                    disponible = mis_recursos.get(rec, 0)
+                    excedente_rec = excedentes_frescos.get(rec, 0)
+                    if disponible >= cant and excedente_rec >= cant:
+                        recursos_a_enviar[rec] = cant
+                    else:
+                        self._log("ALERTA",
+                                  f"No puedo enviar {cant} {rec} a {remitente}: "
+                                  f"disponible={disponible}, excedente={excedente_rec}")
+                        envio_valido = False
+
+                if envio_valido and recursos_a_enviar:
+                    self._log("DECISION", f"ACEPTO oferta de {remitente}, envío {recursos_a_enviar}")
+                    if self._enviar_paquete(remitente, recursos_a_enviar):
+                        ofrecen_str = ", ".join(f"{c} {r}" for r, c in analisis.ofrecen.items())
+                        enviado_str = ", ".join(f"{c} {r}" for r, c in recursos_a_enviar.items())
+                        self._enviar_carta(
+                            remitente, f"Re: {asunto}",
+                            f"Acepto el trato. Te he enviado {enviado_str}. "
+                            f"Espero recibir {ofrecen_str} de tu parte. "
+                            f"Saludos, {self.alias}",
+                        )
+                        intercambios += 1
+                    else:
+                        self._log("ERROR", f"No pude enviar paquete a {remitente}")
+                elif not recursos_a_enviar:
+                    self._log("DECISION",
+                              f"Oferta de {remitente} parecía aceptable pero "
+                              f"no hay recursos válidos para enviar — rechazada")
                 else:
-                    self._log("ERROR", f"No pude enviar paquete a {remitente}")
+                    self._log("DECISION",
+                              f"Oferta de {remitente} rechazada: "
+                              f"no tengo suficientes excedentes para enviar {analisis.piden}")
 
             elif analisis.contraoferta and excedentes:
                 if analisis.contraoferta_dar and analisis.contraoferta_pedir:
@@ -642,14 +740,16 @@ class AgenteNegociador:
                     self._log("DECISION", f"RECHAZO oferta de {remitente} ({analisis.razon})")
                     self._enviar_carta(
                         remitente, f"Re: {asunto}",
-                        f"No me interesa ese intercambio por ahora. Saludos, {self.alias}",
+                        f"Gracias por la oferta, {remitente}, pero por ahora "
+                        f"no me conviene ese intercambio. Saludos, {self.alias}",
                     )
 
             elif analisis.ofrecen or analisis.piden:
                 self._log("DECISION", f"RECHAZO oferta de {remitente} ({analisis.razon})")
                 self._enviar_carta(
                     remitente, f"Re: {asunto}",
-                    f"No me interesa ese intercambio por ahora. Saludos, {self.alias}",
+                    f"Gracias por la oferta, {remitente}, pero por ahora "
+                    f"no me conviene ese intercambio. Saludos, {self.alias}",
                 )
             else:
                 self._log("INFO", f"Mensaje de {remitente} sin propuesta clara: {analisis.razon}")
