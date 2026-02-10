@@ -147,8 +147,11 @@ class AgenteNegociador:
                 "Eres un analizador de mensajes en un juego de intercambio de recursos.\n"
                 "Analiza el mensaje y responde con TODOS estos campos:\n\n"
                 "1) es_aceptacion: ¿El mensaje ACEPTA un trato previo?\n"
-                "   - SÍ: 'acepto', 'trato hecho', 'te envío los recursos', 'perfecto'.\n"
-                "   - NO: rechazos, propuestas nuevas, 'si aceptas dime'.\n\n"
+                "   - SÍ si contiene frases como: 'acepto el trato', 'trato hecho',\n"
+                "     'te he enviado', 'cerramos el trato', 'acepto tu propuesta',\n"
+                "     'de acuerdo', 'perfecto, te envío'.\n"
+                "   - NO si es: rechazo, propuesta nueva, 'si aceptas dime',\n"
+                "     'no me conviene', 'por ahora no', 'no me interesa'.\n\n"
                 "2) es_estafa: ¿Es un intento de estafa?\n"
                 "   - Señales: pedir enviar primero sin garantía, promesas imposibles,\n"
                 "     urgencia/presión, cosas gratis, bugs del sistema, confianza ciega.\n"
@@ -403,7 +406,9 @@ class AgenteNegociador:
             f"Hola {destinatario}, soy {self.alias}. "
             f"Te propongo un intercambio: "
             f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
-            f"¿Qué te parece? Si aceptas, dime y cerramos el trato."
+            f"Si aceptas, responde 'acepto el trato'. "
+            f"Si no te conviene, responde 'no me conviene'. "
+            f"Saludos, {self.alias}"
         )
 
         return {
@@ -471,7 +476,10 @@ class AgenteNegociador:
             f"OFREZCO: {ofrezco_str}\nPIDO: {pido_str}\n\n"
             f"El mensaje debe dejar MUY CLARO qué ofreces y qué pides, "
             f"con las cantidades exactas. Escríbelo como un humano, sin etiquetas "
-            f"ni formatos especiales. Termina pidiendo confirmación.\n"
+            f"ni formatos especiales.\n"
+            f"IMPORTANTE: Termina SIEMPRE el mensaje con esta frase exacta:\n"
+            f"\"Si aceptas, responde 'acepto el trato'. "
+            f"Si no te conviene, responde 'no me conviene'.\"\n"
             f"Escribe SOLO el mensaje, nada más."
         )
 
@@ -544,7 +552,15 @@ class AgenteNegociador:
     # ── helpers de filtrado rápido (sin IA) ────────────────────────────
     _RE_RECHAZO = _re.compile(
         r'no me interesa|no acepto|no puedo aceptar|rechaz|no,? gracias'
-        r'|no tengo lo que|no necesito|no quiero|paso de',
+        r'|no tengo lo que|no necesito|no quiero|paso de'
+        r'|no me conviene|por ahora no|no es lo que busco'
+        r'|no puedo hacer ese|no me sirve|mejor no',
+        _re.IGNORECASE,
+    )
+    _RE_ACEPTACION = _re.compile(
+        r'acepto el trato|trato hecho|te he enviado|cerramos el trato'
+        r'|acepto tu propuesta|acepto,? dime|de acuerdo.*env[ií]'
+        r'|perfecto.*env[ií]|hecho.*te mando',
         _re.IGNORECASE,
     )
     _RE_PROPUESTA = _re.compile(
@@ -574,6 +590,10 @@ class AgenteNegociador:
         if len(limpio) < 15:  # "ok", "gracias", "hola"
             return not self._RE_PROPUESTA.search(limpio)
         return False
+
+    def _es_aceptacion_simple(self, mensaje: str) -> bool:
+        """Detecta aceptaciones textuales sin necesidad de IA."""
+        return bool(self._RE_ACEPTACION.search(mensaje))
 
     def _procesar_buzon(self, necesidades: Dict, excedentes: Dict) -> int:
         """Procesa todas las cartas del buzón usando IA para lenguaje natural."""
@@ -616,6 +636,14 @@ class AgenteNegociador:
             # ── Filtro 2: mensajes muy cortos sin propuesta ──
             if self._es_mensaje_corto_sin_propuesta(mensaje):
                 self._log("INFO", f"Mensaje corto de {remitente} sin propuesta — ignorado")
+                cartas_procesadas.append(uid)
+                continue
+
+            # ── Filtro 3: aceptaciones textuales → sin IA ──
+            if self._es_aceptacion_simple(mensaje):
+                self._log("ANALISIS", f"{remitente} ACEPTA intercambio (detectado por texto, sin IA)")
+                if self._responder_aceptacion(remitente, mensaje):
+                    intercambios += 1
                 cartas_procesadas.append(uid)
                 continue
 
@@ -746,6 +774,7 @@ class AgenteNegociador:
         console.rule(f"[bold]📍 RONDA — Modo: {self.modo.value}[/bold]")
 
         self.ronda_actual += 1
+        _inicio_ronda = time.time()
 
         # Limpiar acuerdos viejos (>5 min)
         ahora = time.time()
@@ -800,6 +829,16 @@ class AgenteNegociador:
 
         # 5. Reset contactados
         self.contactados_esta_ronda = []
+
+        # 6. Si la ronda fue muy rápida (buzón vacío), esperar para dar
+        #    tiempo a que otros bots respondan antes de la siguiente ronda
+        _duracion_ronda = time.time() - _inicio_ronda
+        _espera_minima = self.pausa_entre_rondas * 0.5  # al menos 50% de la pausa
+        if _duracion_ronda < _espera_minima:
+            _esperar = _espera_minima - _duracion_ronda
+            self._log("INFO", f"Ronda rápida ({_duracion_ronda:.1f}s) — "
+                      f"esperando {_esperar:.0f}s para recibir respuestas")
+            time.sleep(_esperar)
 
         return estado["objetivo_completado"] and self.modo == ModoAgente.COMPLETADO
 
