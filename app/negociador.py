@@ -747,6 +747,68 @@ class AgenteNegociador:
         _re.IGNORECASE | _re.DOTALL,
     )
 
+    def _extraer_recursos_mencionados(self, mensaje: str) -> List[str]:
+        """Extrae recursos conocidos mencionados en un mensaje de texto."""
+        msg_lower = mensaje.lower()
+        encontrados = []
+        for recurso in RECURSOS_CONOCIDOS:
+            # Buscar el recurso como palabra completa
+            if _re.search(r'\b' + _re.escape(recurso) + r'\b', msg_lower):
+                encontrados.append(recurso)
+        return encontrados
+
+    def _generar_propuesta_adaptada(self, destinatario: str,
+                                     recursos_que_quiere: List[str],
+                                     necesidades: Dict, excedentes: Dict,
+                                     oro: int) -> Optional[Dict]:
+        """Genera una propuesta adaptada a lo que el otro jugador pidió.
+
+        Cruza lo que el otro quiere con nuestros excedentes,
+        y pide a cambio algo que nosotros necesitamos.
+        """
+        exc_disp = self._excedentes_disponibles(excedentes)
+
+        # Buscar excedentes que coincidan con lo que el otro quiere
+        ofrezco: Dict[str, int] = {}
+        for rec in recursos_que_quiere:
+            if rec in exc_disp and exc_disp[rec] > 0:
+                ofrezco[rec] = min(exc_disp[rec], 2)
+                break  # un recurso por propuesta
+
+        if not ofrezco:
+            return None
+
+        # Pedir algo que necesitemos
+        pido: Dict[str, int] = {}
+        for rec, cant in necesidades.items():
+            clave = (destinatario, list(ofrezco.keys())[0], rec)
+            if not self._rechazo_vigente(clave):
+                pido[rec] = min(cant, 2)
+                break
+
+        if not pido:
+            return None
+
+        ofrezco_str = ", ".join(f"{c} {r}" for r, c in ofrezco.items())
+        pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
+
+        cuerpo = (
+            f"Hola {destinatario}, soy {self.alias}. "
+            f"He visto que necesitas {ofrezco_str}. "
+            f"Te propongo un intercambio: "
+            f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
+            f"Si aceptas, responde 'acepto el trato'. "
+            f"Si no te conviene, responde 'no me conviene'. "
+            f"Saludos, {self.alias}"
+        )
+
+        return {
+            "asunto": f"Propuesta: mi {ofrezco_str} por tu {pido_str}",
+            "cuerpo": cuerpo,
+            "_ofrezco": ofrezco,
+            "_pido": pido,
+        }
+
     def _es_carta_sistema(self, remitente: str, mensaje: str) -> bool:
         """Devuelve True para notificaciones del sistema (no son propuestas)."""
         if remitente.lower() in ("sistema", "server", "butler"):
@@ -893,10 +955,48 @@ class AgenteNegociador:
                 cartas_procesadas.append(uid)
                 continue
 
-            # ── Filtro 1: rechazos simples → no gastar IA ──
+            # ── Filtro 1: rechazos simples → extraer contexto si lo hay ──
             if self._es_rechazo_simple(mensaje, asunto):
-                self._log("INFO", f"Rechazo de {remitente} — ignorado (sin IA)")
                 self._registrar_rechazo(remitente, asunto)
+
+                # Intentar extraer qué recursos quiere el otro jugador
+                recursos_mencionados = self._extraer_recursos_mencionados(mensaje)
+                # Filtrar: solo los que nosotros tenemos de sobra
+                exc_disp = self._excedentes_disponibles(excedentes)
+                recursos_que_podemos_dar = [
+                    r for r in recursos_mencionados
+                    if r in exc_disp and exc_disp[r] > 0
+                ]
+
+                if recursos_que_podemos_dar and necesidades:
+                    self._log("INFO",
+                              f"Rechazo de {remitente} — detectados recursos que quiere: "
+                              f"{recursos_que_podemos_dar} (tenemos excedentes)")
+                    oro_actual = self.info_actual.get("Recursos", {}).get("oro", 0) if self.info_actual else 0
+                    propuesta = self._generar_propuesta_adaptada(
+                        remitente, recursos_que_podemos_dar,
+                        necesidades, excedentes, oro_actual,
+                    )
+                    if propuesta:
+                        self._log("DECISION",
+                                  f"PROPUESTA ADAPTADA a {remitente}: "
+                                  f"dar={propuesta['_ofrezco']}, pedir={propuesta['_pido']}")
+                        if self._enviar_carta(remitente, propuesta["asunto"], propuesta["cuerpo"]):
+                            if remitente not in self.acuerdos_pendientes:
+                                self.acuerdos_pendientes[remitente] = []
+                            self.acuerdos_pendientes[remitente].append({
+                                "recursos_dar": propuesta["_ofrezco"],
+                                "recursos_pedir": propuesta["_pido"],
+                                "timestamp": time.time(),
+                            })
+                            for r_o in propuesta["_ofrezco"]:
+                                for r_p in propuesta["_pido"]:
+                                    self.propuestas_enviadas[(remitente, r_o, r_p)] = self.ronda_actual
+                    else:
+                        self._log("INFO", f"Rechazo de {remitente} — no se pudo generar propuesta adaptada")
+                else:
+                    self._log("INFO", f"Rechazo de {remitente} — ignorado (sin contexto aprovechable)")
+
                 cartas_procesadas.append(uid)
                 continue
 
