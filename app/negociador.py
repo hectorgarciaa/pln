@@ -27,6 +27,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.ollama import OllamaProvider
 from pydantic_ai.settings import ModelSettings
 
 from config import RECURSOS_CONOCIDOS, MODELO_DEFAULT, OLLAMA_URL
@@ -111,7 +113,9 @@ class AgenteNegociador:
         self.debug = debug
 
         # ── Agentes pydantic_ai (structured output) ────────────────────
-        _ai_model = f"ollama:{modelo}"
+        _ollama_base = OLLAMA_URL.rstrip("/") + "/v1"
+        _ai_provider = OllamaProvider(base_url=_ollama_base)
+        _ai_model = OpenAIChatModel(modelo, provider=_ai_provider)
         _ai_settings = ModelSettings(
             temperature=0.3,
             top_p=0.7,
@@ -120,7 +124,7 @@ class AgenteNegociador:
 
         self._agente_aceptacion = Agent(
             _ai_model,
-            result_type=RespuestaAceptacion,
+            output_type=RespuestaAceptacion,
             system_prompt=(
                 "Eres un analizador de mensajes en un juego de intercambio de recursos.\n"
                 "Determina si el mensaje del usuario es una ACEPTACIÓN de un trato propuesto.\n\n"
@@ -136,7 +140,7 @@ class AgenteNegociador:
 
         self._agente_estafa = Agent(
             _ai_model,
-            result_type=RespuestaEstafa,
+            output_type=RespuestaEstafa,
             system_prompt=(
                 "Eres un detector de estafas en un juego de intercambio de recursos.\n"
                 "Señales de estafa: pedir enviar recursos primero sin garantía, "
@@ -151,7 +155,7 @@ class AgenteNegociador:
 
         self._agente_analisis = Agent(
             _ai_model,
-            result_type=RespuestaAnalisis,
+            output_type=RespuestaAnalisis,
             system_prompt=(
                 "Eres un analizador de mensajes en un juego de intercambio de recursos.\n"
                 "Tu ÚNICA tarea es EXTRAER qué ofrece y qué pide el remitente.\n\n"
@@ -323,11 +327,11 @@ class AgenteNegociador:
             result = self._agente_estafa.run_sync(
                 f'Mensaje de "{remitente}": "{mensaje}"'
             )
-            self._log("DEBUG", f"IA estafa: {result.data.model_dump()}")
+            self._log("DEBUG", f"IA estafa: {result.output.model_dump()}")
 
-            if result.data.es_estafa:
+            if result.output.es_estafa:
                 self._log("ALERTA", f"IA detecta posible estafa de {remitente}",
-                          {"razon": result.data.razon})
+                          {"razon": result.output.razon})
                 if remitente not in self.lista_negra:
                     self.lista_negra.append(remitente)
                 return True
@@ -340,8 +344,8 @@ class AgenteNegociador:
         """Usa pydantic_ai para detectar si un mensaje acepta un intercambio."""
         try:
             result = self._agente_aceptacion.run_sync(mensaje)
-            self._log("DEBUG", f"IA aceptación: {result.data.model_dump()}")
-            return result.data.es_aceptacion
+            self._log("DEBUG", f"IA aceptación: {result.output.model_dump()}")
+            return result.output.es_aceptacion
         except Exception as e:
             self._log("ERROR", f"Error pydantic_ai (aceptación): {e}")
             return False
@@ -377,7 +381,7 @@ class AgenteNegociador:
             result = self._agente_analisis.run_sync(
                 f'Mensaje de "{remitente}":\n{mensaje}'
             )
-            analisis = result.data
+            analisis = result.output
             self._log("DEBUG",
                       f"IA análisis: ofrecen={analisis.ofrecen}, piden={analisis.piden}")
 
