@@ -13,9 +13,12 @@ pydantic para validar las respuestas JSON de la IA.
 """
 
 import json
+import os
+import re as _re
+import sys
 import time
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError
@@ -48,7 +51,11 @@ class RespuestaAceptacion(BaseModel):
 
 
 class RespuestaAnalisis(BaseModel):
-    """Respuesta de la IA al analizar un mensaje de negociación."""
+    """Respuesta de la IA al analizar un mensaje de negociación.
+
+    Usa validadores para tolerar respuestas malformadas de la IA
+    (p.ej. contraoferta_pedir como lista en vez de dict).
+    """
     ofrecen: Dict[str, int] = Field(default_factory=dict)
     piden: Dict[str, int] = Field(default_factory=dict)
     aceptar: bool = False
@@ -56,6 +63,17 @@ class RespuestaAnalisis(BaseModel):
     contraoferta: bool = False
     contraoferta_dar: Dict[str, int] = Field(default_factory=dict)
     contraoferta_pedir: Dict[str, int] = Field(default_factory=dict)
+
+    from pydantic import field_validator
+
+    @field_validator("ofrecen", "piden", "contraoferta_dar", "contraoferta_pedir", mode="before")
+    @classmethod
+    def _coerce_to_dict(cls, v: Any) -> Dict[str, int]:
+        """Convierte valores no-dict a dict vacío en vez de fallar."""
+        if isinstance(v, dict):
+            # Asegurar que las claves son str y valores int
+            return {str(k): int(val) for k, val in v.items() if val is not None}
+        return {}
 
 
 # =========================================================================
@@ -111,9 +129,32 @@ class AgenteNegociador:
         self.max_rondas = 10
 
         # ── Configurar loguru ────────────────────────────────────────────
-        # Nivel DEBUG solo si se pidió explícitamente
-        if not debug:
-            logger.disable("negociador")
+        # Limpiar handlers previos (evitar duplicados en multi-bot)
+        logger.remove()
+
+        # Consola: solo si debug
+        if debug:
+            logger.add(sys.stderr, level="DEBUG",
+                       format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
+                              "<level>{level: <8}</level> | "
+                              "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+                              "<level>{message}</level>")
+
+        # Fichero: SIEMPRE (logs/{alias}.log)
+        log_dir = os.path.join(os.path.dirname(__file__), "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, f"{alias}.log")
+        logger.add(
+            log_path,
+            level="DEBUG",
+            rotation="10 MB",
+            retention="7 days",
+            encoding="utf-8",
+            enqueue=True,
+            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | "
+                   "{name}:{function}:{line} - {message}",
+        )
+        logger.info(f"Logs guardados en {log_path}")
 
     # =====================================================================
     # LOGGING
@@ -275,30 +316,49 @@ class AgenteNegociador:
             self._log("ERROR", f"Respuesta IA inválida (aceptación): {e}")
             return False
 
+    def _extraer_ofrecen_piden_regex(self, texto: str) -> Optional[RespuestaAnalisis]:
+        """Fallback: extrae [OFREZCO] y [PIDO] con regex si la IA falla."""
+        ofrecen: Dict[str, int] = {}
+        piden: Dict[str, int] = {}
+
+        patron = _re.compile(r'\[(OFREZCO|PIDO)\]\s*(\d+)\s+(\w+)', _re.IGNORECASE)
+        for match in patron.finditer(texto):
+            tipo, cant, recurso = match.group(1).upper(), int(match.group(2)), match.group(3).lower()
+            if tipo == "OFREZCO":
+                ofrecen[recurso] = int(cant)
+            else:
+                piden[recurso] = int(cant)
+
+        if ofrecen or piden:
+            return RespuestaAnalisis(ofrecen=ofrecen, piden=piden, razon="extraído con regex")
+        return None
+
     def _analizar_mensaje_completo(self, remitente: str, mensaje: str,
                                    necesidades: Dict, excedentes: Dict) -> RespuestaAnalisis:
-        """Analiza completamente un mensaje con IA y devuelve modelo validado."""
+        """Analiza completamente un mensaje con IA y devuelve modelo validado.
+
+        Si la IA falla, intenta extraer [OFREZCO]/[PIDO] con regex.
+        """
         mis_recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
 
         prompt = (
-            f'Eres un asistente de un juego de intercambio de recursos. '
-            f'Analiza este mensaje.\n\n'
-            f'MENSAJE DE "{remitente}": "{mensaje}"\n\n'
+            f'Eres un asistente de un juego de intercambio de recursos.\n'
+            f'Analiza este mensaje y extrae la información de intercambio.\n\n'
+            f'MENSAJE DE "{remitente}":\n"{mensaje}"\n\n'
             f'MI SITUACIÓN:\n'
             f'- Recursos que tengo: {json.dumps(mis_recursos)}\n'
-            f'- Recursos que NECESITO conseguir: {json.dumps(necesidades)}\n'
-            f'- Recursos que me SOBRAN y puedo dar: {json.dumps(excedentes)}\n\n'
-            f'Determina:\n'
-            f'1. ¿Qué recursos OFRECE el remitente?\n'
-            f'2. ¿Qué recursos PIDE el remitente?\n'
-            f'3. ¿Debo aceptar? Solo si me ofrecen algo que NECESITO y piden algo que me SOBRA.\n'
-            f'4. Si no, ¿sugiero contraoferta con mis excedentes?\n\n'
-            f'Responde SOLO con un JSON:\n'
-            f'{{"ofrecen": {{"recurso": cantidad}}, "piden": {{"recurso": cantidad}}, '
-            f'"aceptar": true/false, "razon": "breve", '
-            f'"contraoferta": true/false, '
-            f'"contraoferta_dar": {{"recurso": cantidad}}, '
-            f'"contraoferta_pedir": {{"recurso": cantidad}}}}'
+            f'- Recursos que NECESITO: {json.dumps(necesidades)}\n'
+            f'- Recursos que me SOBRAN: {json.dumps(excedentes)}\n\n'
+            f'INSTRUCCIONES:\n'
+            f'1. Busca las etiquetas [OFREZCO] y [PIDO] en el mensaje.\n'
+            f'2. Extrae qué recursos y cantidades OFRECE el remitente.\n'
+            f'3. Extrae qué recursos y cantidades PIDE el remitente.\n'
+            f'4. Acepta SOLO si me ofrecen algo que necesito Y piden algo que me sobra.\n\n'
+            f'EJEMPLO de respuesta correcta:\n'
+            f'{{"ofrecen": {{"piedra": 4}}, "piden": {{"queso": 3}}, '
+            f'"aceptar": false, "razon": "no necesito piedra", '
+            f'"contraoferta": false, "contraoferta_dar": {{}}, "contraoferta_pedir": {{}}}}\n\n'
+            f'Responde ÚNICAMENTE con el JSON, sin texto adicional.'
         )
 
         respuesta = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
@@ -310,7 +370,19 @@ class AgenteNegociador:
             except ValidationError as e:
                 self._log("ERROR", f"Respuesta IA inválida (análisis): {e}")
 
-        # Fallback seguro
+        # Fallback: extraer con regex las etiquetas [OFREZCO] / [PIDO]
+        regex_result = self._extraer_ofrecen_piden_regex(mensaje)
+        if regex_result:
+            # Decidir si aceptar usando la lógica programática
+            me_ofrecen_lo_que_necesito = any(r in necesidades for r in regex_result.ofrecen)
+            me_piden_lo_que_me_sobra = all(r in excedentes for r in regex_result.piden)
+            regex_result.aceptar = me_ofrecen_lo_que_necesito and me_piden_lo_que_me_sobra
+            regex_result.razon = ("regex: aceptable" if regex_result.aceptar
+                                   else "regex: no cumple mis necesidades")
+            self._log("INFO", f"Fallback regex para carta de {remitente}",
+                      {"ofrecen": regex_result.ofrecen, "piden": regex_result.piden})
+            return regex_result
+
         return RespuestaAnalisis(razon="No se pudo analizar el mensaje")
 
     # =====================================================================
