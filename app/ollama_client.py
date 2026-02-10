@@ -144,14 +144,55 @@ class OllamaClient:
         return respuesta_limpia
 
     def _consultar_simple(self, prompt: str, timeout: int) -> str:
-        """Consulta sin streaming — devuelve respuesta completa."""
-        response = self.client.generate(
+        """Consulta sin rich pero con streaming interno para controlar <think>."""
+        respuesta_completa = ""
+        dentro_de_think = False
+        think_inicio = None
+        pensamiento_cortado = False
+        inicio_global = time.time()
+
+        stream = self.client.generate(
             model=self.modelo,
             prompt=prompt,
-            stream=False,
+            stream=True,
             options=OLLAMA_PARAMS,
         )
-        return self._limpiar_think(response.get("response", ""))
+
+        for chunk in stream:
+            texto = chunk.get("response", "")
+            respuesta_completa += texto
+
+            if time.time() - inicio_global > timeout:
+                logger.debug("⏱ Timeout general en _consultar_simple ({}s)", timeout)
+                break
+
+            if "<think>" in texto.lower() and not dentro_de_think:
+                dentro_de_think = True
+                think_inicio = time.time()
+
+            if "</think>" in texto.lower() and dentro_de_think:
+                dentro_de_think = False
+                think_inicio = None
+
+            if dentro_de_think and think_inicio:
+                if time.time() - think_inicio > THINK_TIMEOUT:
+                    pensamiento_cortado = True
+                    logger.debug("✂ Think cortado en _consultar_simple ({}s)",
+                                 time.time() - think_inicio)
+                    break
+
+            if chunk.get("done"):
+                break
+
+        respuesta_limpia = self._limpiar_think(respuesta_completa)
+
+        if pensamiento_cortado and not respuesta_limpia:
+            if self.soporta_think:
+                logger.debug("🔄 Reintentando sin think (_consultar_simple)")
+                return self._consultar_sin_think(prompt, timeout)
+            return "Error: El modelo se quedó pensando sin generar respuesta"
+
+        return respuesta_limpia
 
     def _consultar_sin_think(self, prompt: str, timeout: int) -> str:
         """Reintento forzando /no_think."""

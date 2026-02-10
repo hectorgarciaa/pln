@@ -271,8 +271,10 @@ class AgenteNegociador:
         )
 
         respuesta = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
+        self._log("DEBUG", f"IA respuesta cruda (estafa): {respuesta[:300]}")
         datos = self._parsear_json_ia(respuesta)
         if datos is None:
+            self._log("WARN", f"No se pudo parsear JSON de IA (estafa)")
             return False
 
         try:
@@ -305,8 +307,10 @@ class AgenteNegociador:
         )
 
         respuesta = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
+        self._log("DEBUG", f"IA respuesta cruda (aceptación): {respuesta[:300]}")
         datos = self._parsear_json_ia(respuesta)
         if datos is None:
+            self._log("WARN", f"No se pudo parsear JSON de IA (aceptación)")
             return False
 
         try:
@@ -372,7 +376,8 @@ class AgenteNegociador:
             f'"contraoferta_dar": {{}}, "contraoferta_pedir": {{}}}}'
         )
 
-        respuesta = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
+        respuesta = self.ia.consultar(prompt, timeout=60, mostrar_progreso=False)
+        self._log("DEBUG", f"IA respuesta cruda (análisis): {respuesta[:500]}")
         datos = self._parsear_json_ia(respuesta)
 
         if datos:
