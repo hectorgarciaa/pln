@@ -59,7 +59,20 @@ class APIClient:
         try:
             response = self.session.get(f"{self.base_url}/gente")
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                # Normalizar: la API puede devolver ["str"] o [{"nombre": ...}]
+                resultado = []
+                for item in data:
+                    if isinstance(item, str):
+                        resultado.append(item)
+                    elif isinstance(item, dict):
+                        # Intentar extraer el nombre del dict
+                        nombre = item.get("nombre") or item.get("name") or item.get("alias") or str(item)
+                        logger.debug("get_gente: item dict normalizado {} -> {}", item, nombre)
+                        resultado.append(nombre)
+                    else:
+                        resultado.append(str(item))
+                return resultado
             logger.warning("Error obteniendo gente: status {}", response.status_code)
             return []
         except requests.RequestException as e:

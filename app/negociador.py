@@ -299,8 +299,11 @@ class AgenteNegociador:
         else:
             alias_propios = alias_propios_raw
 
+        # Asegurar que cada elemento es un string (protección extra)
+        gente_str = [str(p) if not isinstance(p, str) else p for p in self.gente]
+
         disponibles = [
-            p for p in self.gente
+            p for p in gente_str
             if p != self.alias
             and p not in alias_propios
             and p not in self.lista_negra
