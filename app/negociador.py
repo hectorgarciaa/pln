@@ -402,8 +402,10 @@ class AgenteNegociador:
                         and self.propuestas_enviadas[clave] >= self.ronda_actual - 1:
                     continue
 
-                cantidad_pido = min(necesidades[recurso_pido], 3)
+                cantidad_pido = min(necesidades[recurso_pido], 2)
                 cantidad_ofrezco = min(excedentes[recurso_ofrezco], cantidad_pido + 1)
+                if cantidad_ofrezco < 1:
+                    continue
                 ofrezco = {recurso_ofrezco: cantidad_ofrezco}
                 pido = {recurso_pido: cantidad_pido}
                 self.propuesta_index = idx + 1
@@ -483,7 +485,9 @@ class AgenteNegociador:
             f"Vi tu oferta pero no tengo lo que pides. "
             f"Te hago una contrapropuesta: "
             f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
-            f"¿Te interesa? Dime si aceptas."
+            f"Si aceptas, responde 'acepto el trato'. "
+            f"Si no te conviene, responde 'no me conviene'. "
+            f"Saludos, {self.alias}"
         )
 
         return {
@@ -598,9 +602,18 @@ class AgenteNegociador:
         _re.IGNORECASE,
     )
     _RE_PROPUESTA = _re.compile(
-        r'\b(ofrezco|te doy|te ofrezco|propongo|intercambi|cambi|pido|'
+        r'\b(ofrezco|te doy|te ofrezco|propongo|te propongo|pido|'
         r'necesito|quiero|busco|doy .* por|a cambio de|\d+\s+\w+.*por)',
         _re.IGNORECASE,
+    )
+    # Patrón para detectar respuestas de rechazo estructuradas
+    # (las que nosotros mismos generamos y que otros bots también envían)
+    _RE_RESPUESTA_RECHAZO = _re.compile(
+        r'^\s*Gracias por la oferta.*no me conviene'
+        r'|^\s*Gracias por la oferta.*Saludos'
+        r'|^\s*No me interesa.*Saludos'
+        r'|^\s*Por ahora no.*Saludos',
+        _re.IGNORECASE | _re.DOTALL,
     )
 
     def _es_carta_sistema(self, remitente: str, mensaje: str) -> bool:
@@ -611,8 +624,16 @@ class AgenteNegociador:
             return True
         return False
 
-    def _es_rechazo_simple(self, mensaje: str) -> bool:
+    def _es_rechazo_simple(self, mensaje: str, asunto: str = "") -> bool:
         """Detecta rechazos textuales sin necesidad de IA."""
+        # Respuestas de rechazo estructuradas (las que generamos nosotros)
+        if self._RE_RESPUESTA_RECHAZO.search(mensaje):
+            return True
+        # Si el asunto empieza con 'Re:' y el cuerpo tiene texto de rechazo
+        # es una respuesta a nuestra propuesta, no una propuesta nueva
+        asunto_limpio = asunto.strip().lower()
+        if asunto_limpio.startswith("re:") and self._RE_RECHAZO.search(mensaje):
+            return True
         # Si contiene alguna propuesta de intercambio, NO es rechazo simple
         if self._RE_PROPUESTA.search(mensaje):
             return False
@@ -715,7 +736,7 @@ class AgenteNegociador:
                 continue
 
             # ── Filtro 1: rechazos simples → no gastar IA ──
-            if self._es_rechazo_simple(mensaje):
+            if self._es_rechazo_simple(mensaje, asunto):
                 self._log("INFO", f"Rechazo de {remitente} — ignorado (sin IA)")
                 self._registrar_rechazo(remitente, asunto)
                 cartas_procesadas.append(uid)
@@ -809,6 +830,29 @@ class AgenteNegociador:
                               f"no tengo suficientes excedentes para enviar {r.piden}")
 
             elif r.ofrecen or r.piden:
+                # ── ¿Contraoferta? Si ofrecen algo que necesito pero piden
+                #    lo que no tengo → intentar contraoferta con mis excedentes
+                me_ofrecen_util = any(rec in necesidades for rec in r.ofrecen)
+                if me_ofrecen_util and razon == "piden recursos que no me sobran o no tengo suficientes":
+                    contra = self._generar_contraoferta(
+                        remitente, r.ofrecen, necesidades, excedentes)
+                    if contra:
+                        self._log("DECISION",
+                                  f"CONTRAOFERTA a {remitente}: "
+                                  f"dar={contra['_ofrezco']}, pedir={contra['_pido']}")
+                        self._enviar_carta(
+                            remitente, contra["asunto"], contra["cuerpo"])
+                        # Registrar acuerdo pendiente
+                        if remitente not in self.acuerdos_pendientes:
+                            self.acuerdos_pendientes[remitente] = []
+                        self.acuerdos_pendientes[remitente].append({
+                            "recursos_dar": contra["_ofrezco"],
+                            "recursos_pedir": contra["_pido"],
+                            "timestamp": time.time(),
+                        })
+                        cartas_procesadas.append(uid)
+                        continue
+
                 self._log("DECISION", f"RECHAZO oferta de {remitente} ({razon})")
                 # Registrar el rechazo que NOSOTROS hacemos para no repetir
                 self._registrar_rechazo_propio(remitente, r.ofrecen, r.piden)
