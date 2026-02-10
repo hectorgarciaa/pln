@@ -81,6 +81,24 @@ class RespuestaAnalisis(BaseModel):
         return {}
 
 
+class RespuestaUnificada(BaseModel):
+    """Respuesta única de la IA: aceptación + estafa + extracción en 1 llamada."""
+    es_aceptacion: bool = False
+    es_estafa: bool = False
+    ofrecen: Dict[str, int] = Field(default_factory=dict)
+    piden: Dict[str, int] = Field(default_factory=dict)
+    razon: str = ""
+
+    from pydantic import field_validator
+
+    @field_validator("ofrecen", "piden", mode="before")
+    @classmethod
+    def _coerce_to_dict(cls, v: Any) -> Dict[str, int]:
+        if isinstance(v, dict):
+            return {str(k): int(val) for k, val in v.items() if val is not None}
+        return {}
+
+
 # =========================================================================
 # ENUMS
 # =========================================================================
@@ -122,51 +140,28 @@ class AgenteNegociador:
             max_tokens=512,
         )
 
-        self._agente_aceptacion = Agent(
+        self._agente = Agent(
             _ai_model,
-            output_type=RespuestaAceptacion,
+            output_type=RespuestaUnificada,
             system_prompt=(
                 "Eres un analizador de mensajes en un juego de intercambio de recursos.\n"
-                "Determina si el mensaje del usuario es una ACEPTACIÓN de un trato propuesto.\n\n"
-                "Aceptación directa: 'acepto', 'trato hecho', 'de acuerdo'.\n"
-                "Aceptación indirecta: 'te envío los recursos', 'perfecto, enviado'.\n"
-                "NO es aceptación: rechazos ('no me conviene', 'no acepto'), "
-                "propuestas nuevas, ni frases como 'si aceptas, dime'.\n"
-                "Responde de forma concisa."
-            ),
-            model_settings=_ai_settings,
-            retries=2,
-        )
-
-        self._agente_estafa = Agent(
-            _ai_model,
-            output_type=RespuestaEstafa,
-            system_prompt=(
-                "Eres un detector de estafas en un juego de intercambio de recursos.\n"
-                "Señales de estafa: pedir enviar recursos primero sin garantía, "
-                "prometer cosas imposibles, urgencia/presión, cosas gratis sin motivo, "
-                "mencionar bugs del sistema, pedir confianza ciega.\n"
-                "Un intercambio legítimo propone dar X a cambio de Y.\n"
-                "Responde de forma concisa."
-            ),
-            model_settings=_ai_settings,
-            retries=2,
-        )
-
-        self._agente_analisis = Agent(
-            _ai_model,
-            output_type=RespuestaAnalisis,
-            system_prompt=(
-                "Eres un analizador de mensajes en un juego de intercambio de recursos.\n"
-                "Tu ÚNICA tarea es EXTRAER qué ofrece y qué pide el remitente.\n\n"
-                "REGLAS:\n"
-                '- "ofrecen" = lo que el remitente ofrece DAR (lo que yo recibiría).\n'
-                '- "piden" = lo que el remitente quiere RECIBIR (lo que yo daría).\n'
-                "- Solo incluye recursos y cantidades EXPLÍCITOS en el mensaje.\n"
-                "- Rechazo, saludo o no-propuesta → ofrecen={}, piden={}.\n"
-                "- NO inventes datos. Pon aceptar=false SIEMPRE.\n\n"
+                "Analiza el mensaje y responde con TODOS estos campos:\n\n"
+                "1) es_aceptacion: ¿El mensaje ACEPTA un trato previo?\n"
+                "   - SÍ: 'acepto', 'trato hecho', 'te envío los recursos', 'perfecto'.\n"
+                "   - NO: rechazos, propuestas nuevas, 'si aceptas dime'.\n\n"
+                "2) es_estafa: ¿Es un intento de estafa?\n"
+                "   - Señales: pedir enviar primero sin garantía, promesas imposibles,\n"
+                "     urgencia/presión, cosas gratis, bugs del sistema, confianza ciega.\n"
+                "   - Un intercambio legítimo propone dar X a cambio de Y.\n\n"
+                "3) ofrecen / piden: EXTRAER recursos del mensaje.\n"
+                '   - "ofrecen" = lo que el remitente ofrece DAR (lo que yo recibiría).\n'
+                '   - "piden" = lo que el remitente quiere RECIBIR (lo que yo daría).\n'
+                "   - Solo recursos y cantidades EXPLÍCITOS. NO inventes.\n"
+                "   - Rechazo, saludo o no-propuesta → ofrecen={}, piden={}.\n\n"
+                "4) razon: explicación breve de tu análisis.\n\n"
                 'Ejemplo: "yo te doy 2 madera y tú me das 3 piedra"\n'
-                '→ ofrecen={"madera": 2}, piden={"piedra": 3}'
+                '→ es_aceptacion=false, es_estafa=false, '
+                'ofrecen={"madera": 2}, piden={"piedra": 3}'
             ),
             model_settings=_ai_settings,
             retries=2,
@@ -321,35 +316,6 @@ class AgenteNegociador:
                 pass
         return None
 
-    def _es_intento_robo(self, mensaje: str, remitente: str) -> bool:
-        """Usa pydantic_ai para detectar si un mensaje es un intento de estafa."""
-        try:
-            result = self._agente_estafa.run_sync(
-                f'Mensaje de "{remitente}": "{mensaje}"'
-            )
-            self._log("DEBUG", f"IA estafa: {result.output.model_dump()}")
-
-            if result.output.es_estafa:
-                self._log("ALERTA", f"IA detecta posible estafa de {remitente}",
-                          {"razon": result.output.razon})
-                if remitente not in self.lista_negra:
-                    self.lista_negra.append(remitente)
-                return True
-            return False
-        except Exception as e:
-            self._log("ERROR", f"Error pydantic_ai (estafa): {e}")
-            return False
-
-    def _es_aceptacion(self, mensaje: str) -> bool:
-        """Usa pydantic_ai para detectar si un mensaje acepta un intercambio."""
-        try:
-            result = self._agente_aceptacion.run_sync(mensaje)
-            self._log("DEBUG", f"IA aceptación: {result.output.model_dump()}")
-            return result.output.es_aceptacion
-        except Exception as e:
-            self._log("ERROR", f"Error pydantic_ai (aceptación): {e}")
-            return False
-
     def _decidir_aceptar_programatico(self, ofrecen: Dict[str, int],
                                        piden: Dict[str, int],
                                        necesidades: Dict, excedentes: Dict) -> tuple:
@@ -369,32 +335,30 @@ class AgenteNegociador:
             return False, "no ofrecen nada de lo que necesito"
         return False, "piden recursos que no me sobran o no tengo suficientes"
 
-    def _analizar_mensaje_completo(self, remitente: str, mensaje: str,
-                                   necesidades: Dict, excedentes: Dict) -> RespuestaAnalisis:
-        """Analiza un mensaje con pydantic_ai y decide programáticamente.
+    def _analizar_mensaje(self, remitente: str, mensaje: str,
+                          necesidades: Dict, excedentes: Dict) -> RespuestaUnificada:
+        """Analiza un mensaje con UNA sola llamada IA (aceptación + estafa + extracción).
 
-        Flujo:
-        1. pydantic_ai EXTRAE ofrecen/piden (structured output validado)
-        2. _decidir_aceptar_programatico() decide si aceptar
+        Devuelve RespuestaUnificada con todos los campos.
+        La decisión de aceptar se toma programáticamente después.
         """
         try:
-            result = self._agente_analisis.run_sync(
+            result = self._agente.run_sync(
                 f'Mensaje de "{remitente}":\n{mensaje}'
             )
-            analisis = result.output
-            self._log("DEBUG",
-                      f"IA análisis: ofrecen={analisis.ofrecen}, piden={analisis.piden}")
+            r = result.output
+            self._log("DEBUG", f"IA unificada: {r.model_dump()}")
 
-            # Forzar aceptar=False: la IA solo extrae, nosotros decidimos
-            analisis.aceptar = False
-            aceptar, razon = self._decidir_aceptar_programatico(
-                analisis.ofrecen, analisis.piden, necesidades, excedentes)
-            analisis.aceptar = aceptar
-            analisis.razon = razon
-            return analisis
+            # Si es estafa, añadir a lista negra
+            if r.es_estafa and remitente not in self.lista_negra:
+                self.lista_negra.append(remitente)
+                self._log("ALERTA", f"IA detecta posible estafa de {remitente}",
+                          {"razon": r.razon})
+
+            return r
         except Exception as e:
-            self._log("ERROR", f"Error pydantic_ai (análisis): {e}")
-            return RespuestaAnalisis(razon="No se pudo analizar el mensaje")
+            self._log("ERROR", f"Error pydantic_ai: {e}")
+            return RespuestaUnificada(razon="No se pudo analizar el mensaje")
 
     # =====================================================================
     # GENERACIÓN DE PROPUESTAS
@@ -655,30 +619,34 @@ class AgenteNegociador:
                 cartas_procesadas.append(uid)
                 continue
 
-            # ── Paso 1: ¿Aceptación? (IA para lenguaje natural) ──
-            if self._es_aceptacion(mensaje):
+            # ── Análisis unificado (1 sola llamada IA) ──
+            r = self._analizar_mensaje(remitente, mensaje, necesidades, excedentes)
+
+            # ── ¿Estafa? → ignorar ──
+            if r.es_estafa:
+                self._log("ALERTA", f"Estafa detectada de {remitente}: {r.razon}")
+                cartas_procesadas.append(uid)
+                continue
+
+            # ── ¿Aceptación? → responder ──
+            if r.es_aceptacion:
                 self._log("ANALISIS", f"{remitente} ACEPTA intercambio")
                 if self._responder_aceptacion(remitente, mensaje):
                     intercambios += 1
                 cartas_procesadas.append(uid)
                 continue
 
-            # ── Paso 2: ¿Estafa? ──
-            if self._es_intento_robo(mensaje, remitente):
-                cartas_procesadas.append(uid)
-                continue
-
-            # ── Paso 3: Análisis completo (regex fast-path + IA) ──
-            analisis = self._analizar_mensaje_completo(
-                remitente, mensaje, necesidades, excedentes)
+            # ── Decisión programática sobre la propuesta ──
+            aceptar, razon = self._decidir_aceptar_programatico(
+                r.ofrecen, r.piden, necesidades, excedentes)
 
             self._log("ANALISIS", f"Carta de {remitente} analizada", {
-                "ofrecen": analisis.ofrecen, "piden": analisis.piden,
-                "aceptar": analisis.aceptar, "razon": analisis.razon,
+                "ofrecen": r.ofrecen, "piden": r.piden,
+                "aceptar": aceptar, "razon": razon,
             })
 
             # ── Decisión: aceptar ──
-            if analisis.aceptar and analisis.piden:
+            if aceptar and r.piden:
                 # VALIDAR antes de enviar: ¿me piden cosas que realmente me sobran?
                 self._actualizar_estado()
                 mis_recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
@@ -688,7 +656,7 @@ class AgenteNegociador:
 
                 envio_valido = True
                 recursos_a_enviar: Dict[str, int] = {}
-                for rec, cant in analisis.piden.items():
+                for rec, cant in r.piden.items():
                     if cant <= 0:
                         continue
                     disponible = mis_recursos.get(rec, 0)
@@ -704,7 +672,7 @@ class AgenteNegociador:
                 if envio_valido and recursos_a_enviar:
                     self._log("DECISION", f"ACEPTO oferta de {remitente}, envío {recursos_a_enviar}")
                     if self._enviar_paquete(remitente, recursos_a_enviar):
-                        ofrecen_str = ", ".join(f"{c} {r}" for r, c in analisis.ofrecen.items())
+                        ofrecen_str = ", ".join(f"{c} {r}" for r, c in r.ofrecen.items())
                         enviado_str = ", ".join(f"{c} {r}" for r, c in recursos_a_enviar.items())
                         self._enviar_carta(
                             remitente, f"Re: {asunto}",
@@ -722,41 +690,17 @@ class AgenteNegociador:
                 else:
                     self._log("DECISION",
                               f"Oferta de {remitente} rechazada: "
-                              f"no tengo suficientes excedentes para enviar {analisis.piden}")
+                              f"no tengo suficientes excedentes para enviar {r.piden}")
 
-            elif analisis.contraoferta and excedentes:
-                if analisis.contraoferta_dar and analisis.contraoferta_pedir:
-                    contra = self._generar_contraoferta(
-                        remitente, analisis.ofrecen, necesidades, excedentes)
-                    if contra:
-                        self._log("DECISION", f"CONTRAOFERTA a {remitente}",
-                                  {"ofrezco": contra["_ofrezco"], "pido": contra["_pido"]})
-                        if self._enviar_carta(remitente, contra["asunto"], contra["cuerpo"]):
-                            acuerdo = {
-                                "recursos_dar": contra["_ofrezco"],
-                                "recursos_pedir": contra["_pido"],
-                                "timestamp": time.time(),
-                            }
-                            if remitente not in self.acuerdos_pendientes:
-                                self.acuerdos_pendientes[remitente] = []
-                            self.acuerdos_pendientes[remitente].append(acuerdo)
-                else:
-                    self._log("DECISION", f"RECHAZO oferta de {remitente} ({analisis.razon})")
-                    self._enviar_carta(
-                        remitente, f"Re: {asunto}",
-                        f"Gracias por la oferta, {remitente}, pero por ahora "
-                        f"no me conviene ese intercambio. Saludos, {self.alias}",
-                    )
-
-            elif analisis.ofrecen or analisis.piden:
-                self._log("DECISION", f"RECHAZO oferta de {remitente} ({analisis.razon})")
+            elif r.ofrecen or r.piden:
+                self._log("DECISION", f"RECHAZO oferta de {remitente} ({razon})")
                 self._enviar_carta(
                     remitente, f"Re: {asunto}",
                     f"Gracias por la oferta, {remitente}, pero por ahora "
                     f"no me conviene ese intercambio. Saludos, {self.alias}",
                 )
             else:
-                self._log("INFO", f"Mensaje de {remitente} sin propuesta clara: {analisis.razon}")
+                self._log("INFO", f"Mensaje de {remitente} sin propuesta clara: {razon}")
 
             cartas_procesadas.append(uid)
 
