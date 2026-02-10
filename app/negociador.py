@@ -192,7 +192,7 @@ class AgenteNegociador:
         # clave = (destinatario, recurso_ofrezco, recurso_pido), valor = ronda
         # Expiran tras RECHAZO_TTL rondas para reintentar con nuevas condiciones
         self.rechazos_recibidos: Dict[tuple, int] = {}
-        self.RECHAZO_TTL: int = 1  # rondas antes de reintentar un combo rechazado
+        self.RECHAZO_TTL: int = 2  # rondas antes de reintentar un combo rechazado
 
         # Configuración
         self.pausa_entre_acciones = 1
@@ -442,7 +442,7 @@ class AgenteNegociador:
                 if self._rechazo_vigente(clave):
                     continue
                 if clave in self.propuestas_enviadas \
-                        and self.propuestas_enviadas[clave] >= self.ronda_actual - 1:
+                        and self.ronda_actual - self.propuestas_enviadas[clave] < 2:
                     continue
 
                 cantidad_pido = min(necesidades[recurso_pido], 2)
@@ -472,7 +472,11 @@ class AgenteNegociador:
                             encontrado = True
                             break
                 if not encontrado:
-                    self._log("INFO", f"Sin combinaciones nuevas para {destinatario}")
+                    comprometidos = self._recursos_comprometidos()
+                    self._log("INFO", f"Sin combinaciones nuevas para {destinatario}",
+                              {"rechazos_vigentes": len(self.rechazos_recibidos),
+                               "comprometidos": comprometidos,
+                               "oro_libre": oro - comprometidos.get('oro', 0)})
                     return None
 
         elif necesidades and oro > 2:
@@ -1068,15 +1072,29 @@ class AgenteNegociador:
         self.ronda_actual += 1
         _inicio_ronda = time.time()
 
-        # Limpiar acuerdos viejos (>5 min)
+        # Limpiar acuerdos viejos (>90s ≈ 2-3 rondas sin respuesta)
         ahora = time.time()
+        _ACUERDO_TTL = 90  # segundos
         for persona in list(self.acuerdos_pendientes.keys()):
+            viejos = [a for a in self.acuerdos_pendientes[persona]
+                      if ahora - a.get("timestamp", 0) >= _ACUERDO_TTL]
+            if viejos:
+                self._log("INFO", f"Liberando {len(viejos)} acuerdo(s) pendiente(s) "
+                          f"con {persona} (sin respuesta en {_ACUERDO_TTL}s)")
             self.acuerdos_pendientes[persona] = [
                 a for a in self.acuerdos_pendientes[persona]
-                if ahora - a.get("timestamp", 0) < 300
+                if ahora - a.get("timestamp", 0) < _ACUERDO_TTL
             ]
             if not self.acuerdos_pendientes[persona]:
                 del self.acuerdos_pendientes[persona]
+
+        # Limpiar propuestas_enviadas antiguas para poder reintentar
+        claves_viejas = [
+            k for k, ronda in self.propuestas_enviadas.items()
+            if self.ronda_actual - ronda > 2
+        ]
+        for k in claves_viejas:
+            del self.propuestas_enviadas[k]
 
         # 1. Actualizar estado
         estado = self._actualizar_estado()

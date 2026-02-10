@@ -26,7 +26,8 @@ class Settings(BaseModel):
     """Configuración global del proyecto — todos los valores son validados."""
 
     # ── URLs ─────────────────────────────────────────────────────────────
-    api_base_url: str = "http://147.96.81.252:7719"
+    api_base_aux: str = "http://147.96.81.252:7719"
+    api_base_url: str = "http://147.0.0.1:7719"
     ollama_url: str = "http://127.0.0.1:11434"
 
     # ── Modelos de IA ────────────────────────────────────────────────────
