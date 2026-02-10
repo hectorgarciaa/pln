@@ -26,7 +26,10 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from config import RECURSOS_CONOCIDOS, MODELO_DEFAULT
+from pydantic_ai import Agent
+from pydantic_ai.settings import ModelSettings
+
+from config import RECURSOS_CONOCIDOS, MODELO_DEFAULT, OLLAMA_URL
 from api_client import APIClient
 from ollama_client import OllamaClient
 
@@ -106,6 +109,64 @@ class AgenteNegociador:
         self.api = APIClient(base_url=api_url, source_ip=source_ip)
         self.ia = OllamaClient(modelo)
         self.debug = debug
+
+        # ── Agentes pydantic_ai (structured output) ────────────────────
+        _ai_model = f"ollama:{modelo}"
+        _ai_settings = ModelSettings(
+            temperature=0.3,
+            top_p=0.7,
+            max_tokens=512,
+        )
+
+        self._agente_aceptacion = Agent(
+            _ai_model,
+            result_type=RespuestaAceptacion,
+            system_prompt=(
+                "Eres un analizador de mensajes en un juego de intercambio de recursos.\n"
+                "Determina si el mensaje del usuario es una ACEPTACIÓN de un trato propuesto.\n\n"
+                "Aceptación directa: 'acepto', 'trato hecho', 'de acuerdo'.\n"
+                "Aceptación indirecta: 'te envío los recursos', 'perfecto, enviado'.\n"
+                "NO es aceptación: rechazos ('no me conviene', 'no acepto'), "
+                "propuestas nuevas, ni frases como 'si aceptas, dime'.\n"
+                "Responde de forma concisa."
+            ),
+            model_settings=_ai_settings,
+            retries=2,
+        )
+
+        self._agente_estafa = Agent(
+            _ai_model,
+            result_type=RespuestaEstafa,
+            system_prompt=(
+                "Eres un detector de estafas en un juego de intercambio de recursos.\n"
+                "Señales de estafa: pedir enviar recursos primero sin garantía, "
+                "prometer cosas imposibles, urgencia/presión, cosas gratis sin motivo, "
+                "mencionar bugs del sistema, pedir confianza ciega.\n"
+                "Un intercambio legítimo propone dar X a cambio de Y.\n"
+                "Responde de forma concisa."
+            ),
+            model_settings=_ai_settings,
+            retries=2,
+        )
+
+        self._agente_analisis = Agent(
+            _ai_model,
+            result_type=RespuestaAnalisis,
+            system_prompt=(
+                "Eres un analizador de mensajes en un juego de intercambio de recursos.\n"
+                "Tu ÚNICA tarea es EXTRAER qué ofrece y qué pide el remitente.\n\n"
+                "REGLAS:\n"
+                '- "ofrecen" = lo que el remitente ofrece DAR (lo que yo recibiría).\n'
+                '- "piden" = lo que el remitente quiere RECIBIR (lo que yo daría).\n'
+                "- Solo incluye recursos y cantidades EXPLÍCITOS en el mensaje.\n"
+                "- Rechazo, saludo o no-propuesta → ofrecen={}, piden={}.\n"
+                "- NO inventes datos. Pon aceptar=false SIEMPRE.\n\n"
+                'Ejemplo: "yo te doy 2 madera y tú me das 3 piedra"\n'
+                '→ ofrecen={"madera": 2}, piden={"piedra": 3}'
+            ),
+            model_settings=_ai_settings,
+            retries=2,
+        )
 
         # Estado
         self.modo = ModoAgente.CONSEGUIR_OBJETIVO
@@ -257,67 +318,32 @@ class AgenteNegociador:
         return None
 
     def _es_intento_robo(self, mensaje: str, remitente: str) -> bool:
-        """Usa IA para detectar si un mensaje es un intento de estafa."""
-        prompt = (
-            f'Analiza si este mensaje de un juego de intercambio de recursos '
-            f'es un intento de ESTAFA o ROBO.\n\n'
-            f'MENSAJE DE "{remitente}": "{mensaje}"\n\n'
-            f'Señales de estafa: pedir que envíes recursos primero sin garantía, '
-            f'prometer cosas imposibles, usar urgencia o presión, ofrecer cosas '
-            f'gratis sin motivo, mencionar bugs o errores del sistema, '
-            f'pedir confianza ciega, etc.\n\n'
-            f'Responde SOLO con un JSON: {{"es_estafa": true/false, "razon": "explicación breve"}}\n'
-            f'No escribas nada más.'
-        )
-
-        respuesta = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
-        self._log("DEBUG", f"IA respuesta cruda (estafa): {respuesta[:300]}")
-        datos = self._parsear_json_ia(respuesta)
-        if datos is None:
-            self._log("WARN", f"No se pudo parsear JSON de IA (estafa)")
-            return False
-
+        """Usa pydantic_ai para detectar si un mensaje es un intento de estafa."""
         try:
-            resultado = RespuestaEstafa(**datos)
-        except ValidationError as e:
-            self._log("ERROR", f"Respuesta IA inválida (estafa): {e}")
+            result = self._agente_estafa.run_sync(
+                f'Mensaje de "{remitente}": "{mensaje}"'
+            )
+            self._log("DEBUG", f"IA estafa: {result.data.model_dump()}")
+
+            if result.data.es_estafa:
+                self._log("ALERTA", f"IA detecta posible estafa de {remitente}",
+                          {"razon": result.data.razon})
+                if remitente not in self.lista_negra:
+                    self.lista_negra.append(remitente)
+                return True
             return False
-
-        if resultado.es_estafa:
-            self._log("ALERTA", f"IA detecta posible estafa de {remitente}",
-                      {"razon": resultado.razon})
-            if remitente not in self.lista_negra:
-                self.lista_negra.append(remitente)
-            return True
-
-        return False
+        except Exception as e:
+            self._log("ERROR", f"Error pydantic_ai (estafa): {e}")
+            return False
 
     def _es_aceptacion(self, mensaje: str) -> bool:
-        """Usa IA para detectar si un mensaje acepta un intercambio."""
-        prompt = (
-            f'En un juego de intercambio de recursos, analiza si este mensaje '
-            f'es una ACEPTACIÓN de un trato propuesto.\n\n'
-            f'MENSAJE: "{mensaje}"\n\n'
-            f'Una aceptación puede ser directa ("acepto", "trato hecho") o indirecta '
-            f'("te envío los recursos", "perfecto").\n'
-            f'Un rechazo es lo contrario ("no me interesa", "no acepto", "muy caro").\n'
-            f'Si es una propuesta nueva (no una respuesta a un trato), NO es una aceptación.\n\n'
-            f'Responde SOLO con un JSON: {{"es_aceptacion": true/false, "razon": "explicación breve"}}\n'
-            f'No escribas nada más.'
-        )
-
-        respuesta = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
-        self._log("DEBUG", f"IA respuesta cruda (aceptación): {respuesta[:300]}")
-        datos = self._parsear_json_ia(respuesta)
-        if datos is None:
-            self._log("WARN", f"No se pudo parsear JSON de IA (aceptación)")
-            return False
-
+        """Usa pydantic_ai para detectar si un mensaje acepta un intercambio."""
         try:
-            resultado = RespuestaAceptacion(**datos)
-            return resultado.es_aceptacion
-        except ValidationError as e:
-            self._log("ERROR", f"Respuesta IA inválida (aceptación): {e}")
+            result = self._agente_aceptacion.run_sync(mensaje)
+            self._log("DEBUG", f"IA aceptación: {result.data.model_dump()}")
+            return result.data.es_aceptacion
+        except Exception as e:
+            self._log("ERROR", f"Error pydantic_ai (aceptación): {e}")
             return False
 
     def _decidir_aceptar_programatico(self, ofrecen: Dict[str, int],
@@ -341,61 +367,30 @@ class AgenteNegociador:
 
     def _analizar_mensaje_completo(self, remitente: str, mensaje: str,
                                    necesidades: Dict, excedentes: Dict) -> RespuestaAnalisis:
-        """Analiza un mensaje con IA y devuelve modelo validado.
+        """Analiza un mensaje con pydantic_ai y decide programáticamente.
 
         Flujo:
-        1. La IA EXTRAE ofrecen/piden del mensaje (no decide nada)
+        1. pydantic_ai EXTRAE ofrecen/piden (structured output validado)
         2. _decidir_aceptar_programatico() decide si aceptar
         """
-        mis_recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
-        recursos_validos = list(mis_recursos.keys()) if mis_recursos else RECURSOS_CONOCIDOS
+        try:
+            result = self._agente_analisis.run_sync(
+                f'Mensaje de "{remitente}":\n{mensaje}'
+            )
+            analisis = result.data
+            self._log("DEBUG",
+                      f"IA análisis: ofrecen={analisis.ofrecen}, piden={analisis.piden}")
 
-        prompt = (
-            f'Eres un analizador de mensajes en un juego de intercambio de recursos.\n'
-            f'Tu ÚNICA tarea es EXTRAER datos del mensaje, NO inventarlos.\n\n'
-            f'───── MENSAJE DE "{remitente}" ─────\n'
-            f'{mensaje}\n'
-            f'───── FIN DEL MENSAJE ─────\n\n'
-            f'RECURSOS VÁLIDOS en este juego: {json.dumps(recursos_validos)}\n\n'
-            f'REGLAS ESTRICTAS:\n'
-            f'1. "ofrecen" = lo que el REMITENTE ofrece DARME a mí '
-            f'(lo que yo RECIBIRÍA). Solo incluye recursos y cantidades '
-            f'que el remitente MENCIONA EXPLÍCITAMENTE en su mensaje.\n'
-            f'2. "piden" = lo que el REMITENTE quiere RECIBIR de mí '
-            f'(lo que yo DARÍA). Solo incluye recursos y cantidades '
-            f'que el remitente MENCIONA EXPLÍCITAMENTE en su mensaje.\n'
-            f'3. Si el mensaje es un RECHAZO, saludo, agradecimiento, '
-            f'o cualquier cosa que NO sea una propuesta de intercambio: '
-            f'devuelve ofrecen={{}}, piden={{}}.\n'
-            f'4. NO inventes recursos ni cantidades que no aparezcan en el texto.\n'
-            f'5. NO uses mi inventario para rellenar campos.\n'
-            f'6. Pon "aceptar": false SIEMPRE (yo decido luego).\n\n'
-            f'Responde SOLO con este JSON (sin texto antes ni después):\n'
-            f'{{"ofrecen": {{}}, "piden": {{}}, "aceptar": false, '
-            f'"razon": "breve explicación", "contraoferta": false, '
-            f'"contraoferta_dar": {{}}, "contraoferta_pedir": {{}}}}'
-        )
-
-        respuesta = self.ia.consultar(prompt, timeout=60, mostrar_progreso=False)
-        self._log("DEBUG", f"IA respuesta cruda (análisis): {respuesta[:500]}")
-        datos = self._parsear_json_ia(respuesta)
-
-        if datos:
-            try:
-                # Forzar aceptar=False: la IA solo extrae, nosotros decidimos
-                datos["aceptar"] = False
-                analisis = RespuestaAnalisis(**datos)
-
-                # Decisión programática
-                aceptar, razon = self._decidir_aceptar_programatico(
-                    analisis.ofrecen, analisis.piden, necesidades, excedentes)
-                analisis.aceptar = aceptar
-                analisis.razon = razon
-                return analisis
-            except ValidationError as e:
-                self._log("ERROR", f"Respuesta IA inválida (análisis): {e}")
-
-        return RespuestaAnalisis(razon="No se pudo analizar el mensaje")
+            # Forzar aceptar=False: la IA solo extrae, nosotros decidimos
+            analisis.aceptar = False
+            aceptar, razon = self._decidir_aceptar_programatico(
+                analisis.ofrecen, analisis.piden, necesidades, excedentes)
+            analisis.aceptar = aceptar
+            analisis.razon = razon
+            return analisis
+        except Exception as e:
+            self._log("ERROR", f"Error pydantic_ai (análisis): {e}")
+            return RespuestaAnalisis(razon="No se pudo analizar el mensaje")
 
     # =====================================================================
     # GENERACIÓN DE PROPUESTAS
