@@ -193,6 +193,9 @@ class AgenteNegociador:
         # Expiran tras RECHAZO_TTL rondas para reintentar con nuevas condiciones
         self.rechazos_recibidos: Dict[tuple, int] = {}
         self.RECHAZO_TTL: int = 2  # rondas antes de reintentar un combo rechazado
+        
+        # Snapshot de recursos para detectar paquetes recibidos
+        self.recursos_ronda_anterior: Dict[str, int] = {}
 
         # Configuración
         self.pausa_entre_acciones = 1
@@ -445,11 +448,33 @@ class AgenteNegociador:
                         and self.ronda_actual - self.propuestas_enviadas[clave] < 2:
                     continue
 
-                cantidad = 1  # intercambio 1:1
-                if exc_disp[recurso_ofrezco] < cantidad:
+                # Si tenemos >15 excedentes de este recurso, ofrecer más (hasta 3)
+                # para hacer el trato más atractivo
+                cantidad_ofrezco = 1
+                mis_recursos_totales = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+                cantidad_total_recurso = mis_recursos_totales.get(recurso_ofrezco, 0)
+                
+                # Verificar que realmente tenemos el recurso disponible
+                if cantidad_total_recurso <= 0 or exc_disp[recurso_ofrezco] <= 0:
+                    self._log("DEBUG", f"Saltando propuesta: no tenemos {recurso_ofrezco} disponible")
                     continue
-                ofrezco = {recurso_ofrezco: cantidad}
-                pido = {recurso_pido: cantidad}
+                
+                if cantidad_total_recurso > 15:
+                    # Ofrecer 2-3 unidades por 1 (más generoso cuando sobra mucho)
+                    cantidad_ofrezco = min(exc_disp[recurso_ofrezco], 3)
+                    cantidad_pido = 1
+                    self._log("INFO", f"Oferta generosa a {destinatario}: "
+                              f"{cantidad_ofrezco} {recurso_ofrezco} por 1 {recurso_pido} "
+                              f"(tenemos {cantidad_total_recurso} {recurso_ofrezco})")
+                else:
+                    # Trato normal 1:1
+                    cantidad_pido = 1
+                
+                if exc_disp[recurso_ofrezco] < cantidad_ofrezco:
+                    continue
+                    
+                ofrezco = {recurso_ofrezco: cantidad_ofrezco}
+                pido = {recurso_pido: cantidad_pido}
                 self.propuesta_index = idx + 1
                 break
             else:
@@ -636,13 +661,18 @@ class AgenteNegociador:
         mis_recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
         for rec, cant in recursos.items():
             if mis_recursos.get(rec, 0) < cant:
-                self._log("ERROR", f"No hay suficiente {rec}",
+                self._log("ERROR", f"❌ No tenemos suficiente {rec} para enviar",
                           {"necesario": cant, "disponible": mis_recursos.get(rec, 0)})
                 return False
 
         exito = self.api.enviar_paquete(destinatario, recursos)
-        self._log("INTERCAMBIO", f"Paquete a {destinatario}",
-                  {"recursos": recursos, "exito": exito})
+        recursos_str = ", ".join(f"{cant} {rec}" for rec, cant in recursos.items())
+        
+        if exito:
+            self._log("EXITO", f"📤 ENVIAMOS a {destinatario}: {recursos_str}")
+        else:
+            self._log("ERROR", f"❌ Fallo al enviar paquete a {destinatario}",
+                      {"recursos": recursos_str})
 
         if exito:
             self.intercambios_realizados.append({
@@ -652,6 +682,33 @@ class AgenteNegociador:
                 "timestamp": time.time(),
             })
         return exito
+
+    def _procesar_paquetes_recibidos(self):
+        """Loggea los paquetes recibidos durante esta ronda.
+        
+        Los paquetes aparecen automáticamente en Recursos cuando llegan,
+        pero loggeamos el cambio para visibilidad.
+        """
+        if not self.info_actual:
+            return
+        
+        recursos_actuales = self.info_actual.get("Recursos", {})
+        
+        # Comparar con el snapshot de la ronda anterior
+        if self.recursos_ronda_anterior:
+            incrementos = {}
+            for recurso, cantidad in recursos_actuales.items():
+                cantidad_anterior = self.recursos_ronda_anterior.get(recurso, 0)
+                incremento = cantidad - cantidad_anterior
+                if incremento > 0:
+                    incrementos[recurso] = incremento
+            
+            if incrementos:
+                items_str = ", ".join(f"{cant} {rec}" for rec, cant in incrementos.items())
+                self._log("EXITO", f"📥 HEMOS RECIBIDO: {items_str}")
+        
+        # Actualizar snapshot para la próxima ronda
+        self.recursos_ronda_anterior = recursos_actuales.copy()
 
     def _responder_aceptacion(self, remitente: str, mensaje_original: str) -> bool:
         """Responde a una aceptación enviando los recursos acordados.
@@ -684,6 +741,8 @@ class AgenteNegociador:
             del self.acuerdos_pendientes[remitente]
 
         recursos_a_enviar = acuerdo.get("recursos_dar", {})
+        recursos_a_recibir = acuerdo.get("recursos_pedir", {})
+        
         if not recursos_a_enviar:
             self._log("INFO", f"Acuerdo con {remitente} sin recursos a enviar")
             return False
@@ -699,7 +758,13 @@ class AgenteNegociador:
                           f"necesito {cant} {rec} pero solo tengo {disponible}")
                 return False
 
-        self._log("DECISION", f"Ejecutando acuerdo con {remitente}: envío {recursos_a_enviar}")
+        envio_str = ", ".join(f"{c} {r}" for r, c in recursos_a_enviar.items())
+        recibo_str = ", ".join(f"{c} {r}" for r, c in recursos_a_recibir.items())
+        
+        self._log("DECISION", 
+                  f"🤝 Ejecutando acuerdo con {remitente}: "
+                  f"doy {envio_str} por {recibo_str}")
+        
         if self._enviar_paquete(remitente, recursos_a_enviar):
             return True
         else:
@@ -1057,10 +1122,10 @@ class AgenteNegociador:
                         envio_valido = False
 
                 if envio_valido and recursos_a_enviar:
-                    self._log("DECISION", f"ACEPTO oferta de {remitente}, envío {recursos_a_enviar}")
+                    ofrecen_str = ", ".join(f"{c} {r}" for r, c in r.ofrecen.items())
+                    enviado_str = ", ".join(f"{c} {r}" for r, c in recursos_a_enviar.items())
+                    self._log("EXITO", f"🤝 ACEPTO oferta de {remitente}: doy {enviado_str} por {ofrecen_str}")
                     if self._enviar_paquete(remitente, recursos_a_enviar):
-                        ofrecen_str = ", ".join(f"{c} {r}" for r, c in r.ofrecen.items())
-                        enviado_str = ", ".join(f"{c} {r}" for r, c in recursos_a_enviar.items())
                         self._enviar_carta(
                             remitente, f"Re: {asunto}",
                             f"Acepto el trato. Te he enviado {enviado_str}. "
@@ -1199,10 +1264,21 @@ class AgenteNegociador:
         oro = estado["oro"]
         objetivo_completado = estado["objetivo_completado"]
 
-        self._log("INFO", "Estado actual", {
-            "oro": oro, "necesidades": necesidades,
-            "excedentes": excedentes, "objetivo_completado": objetivo_completado,
-        })
+        # Log de situación actual más visible
+        recursos_actuales = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+        if recursos_actuales:
+            recursos_str = ", ".join(f"{rec}: {cant}" for rec, cant in sorted(recursos_actuales.items()))
+            self._log("INFO", f"📦 INVENTARIO: {recursos_str}")
+        
+        if necesidades:
+            nec_str = ", ".join(f"{cant} {rec}" for rec, cant in necesidades.items())
+            self._log("INFO", f"🎯 NECESITAMOS: {nec_str}")
+        
+        if excedentes:
+            exc_str = ", ".join(f"{cant} {rec}" for rec, cant in excedentes.items())
+            self._log("INFO", f"💰 EXCEDENTES: {exc_str}")
+        
+        self._log("INFO", f"🪙 ORO: {oro} | Objetivo: {'✅ COMPLETADO' if objetivo_completado else '⏳ En progreso'}")
 
         # 2. ¿Cambiar de modo?
         if objetivo_completado and self.modo == ModoAgente.CONSEGUIR_OBJETIVO:
@@ -1218,9 +1294,17 @@ class AgenteNegociador:
         self._log("INFO", "Procesando buzón…")
         intercambios = self._procesar_buzon(necesidades, excedentes)
 
+        # 3.5. Procesar paquetes recibidos (los paquetes se reflejan automáticamente en Recursos)
+        self._procesar_paquetes_recibidos()
+
         if intercambios > 0:
-            self._log("EXITO", f"{intercambios} intercambio(s) realizado(s)")
+            self._log("EXITO", f"✅ {intercambios} intercambio(s) completado(s) esta ronda")
             estado = self._actualizar_estado()
+            # Mostrar situación actualizada después de intercambios
+            recursos_actuales = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+            if recursos_actuales:
+                recursos_str = ", ".join(f"{rec}: {cant}" for rec, cant in sorted(recursos_actuales.items()))
+                self._log("INFO", f"📦 INVENTARIO ACTUALIZADO: {recursos_str}")
             necesidades = estado["necesidades"]
             excedentes = estado["excedentes"]
 
