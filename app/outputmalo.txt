@@ -1,0 +1,112 @@
+Tu alias para negociar: AmarNoEsDelito
+───────────────────────── 🤖 Configuración del Agente ──────────────────────────
+              Modelos disponibles               
+┏━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ # ┃ Modelo      ┃ Descripción                ┃
+┡━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ 1 │ llama3.2:3b │ ⚡⚡⚡ ULTRA RÁPIDO (3-5s) │
+│ 2 │ qwen3-vl:8b │ ⚡⚡ Balance (5-10s)       │
+│ 3 │ qwen2.5:7b  │ ⚡ Calidad (10-15s)        │
+│ 4 │ phi3:mini   │ ⚡⚡⚡ Muy rápido (3-5s)   │
+│ 5 │ qwen3:8b    │ solo Texto ← default       │
+└───┴─────────────┴────────────────────────────┘
+Selecciona modelo [1/2/3/4/5] (1): 5
+¿Activar modo DEBUG? [y/n] (y): y
+Máximo de rondas (10): 20
+Segundos entre rondas (30): 30
+    📋 Resumen de Configuración    
+┌──────────────┬──────────────────┐
+│  Alias       │  AmarNoEsDelito  │
+│  Modelo      │  qwen3:8b        │
+│  Debug       │  ✅ ACTIVADO     │
+│  Max rondas  │  20              │
+│  Pausa       │  30s             │
+└──────────────┴──────────────────┘
+
+¿Iniciar agente? [y/n] (y): y
+2026-02-10 16:33:56.546 | INFO     | negociador:__init__:228 - Logs guardados en /home/hlocal/Documents/pln/pln/app/logs/AmarNoEsDelito.log
+╭───────────────────────────────╮
+│ 🤖 AGENTE NEGOCIADOR AUTÓNOMO │
+│                               │
+│   Alias:      AmarNoEsDelito  │
+│   Modelo:     qwen3:8b        │
+│   Debug:      ACTIVADO        │
+│   Max rondas: 20              │
+╰───────────────────────────────╯
+2026-02-10 16:33:56.550 | ERROR    | api_client:crear_alias:83 - Error de conexión (crear alias): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /alias/AmarNoEsDelito (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+⚠ No se pudo crear el alias 'AmarNoEsDelito', puede que ya exista.
+
+🔄 RONDA 1/20
+───────────────────── 📍 RONDA — Modo: conseguir_objetivo ──────────────────────
+2026-02-10 16:33:56.553 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:33:56.554 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:33:56.554 | ERROR    | negociador:_ejecutar_ronda:1081 - ❌ [ERROR] No se pudo conectar a la API
+  ❌ [ERROR] No se pudo conectar a la API
+
+⏳ Esperando 30s para respuestas…
+
+🔄 RONDA 2/20
+────────────────────────────────────── 📍 RONDA — Modo: conseguir_objetivo ───────────────────────────────────────
+2026-02-10 16:34:26.558 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:34:26.559 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:34:26.560 | ERROR    | negociador:_ejecutar_ronda:1081 - ❌ [ERROR] No se pudo conectar a la API
+  ❌ [ERROR] No se pudo conectar a la API
+
+⏳ Esperando 30s para respuestas…
+^C
+
+⏹️ Agente detenido por el usuario
+2026-02-10 16:34:41.072 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:34:41.074 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+
+       📊 Resumen de Ejecución        
+┌───────────────────┬────────────────┐
+│  💰 Oro final     │  0             │
+│  🎯 Objetivo      │  ❌ PENDIENTE  │
+│  🔄 Intercambios  │  0             │
+│  🛡️ Lista negra   │  0             │
+└───────────────────┴────────────────┘
+─────────────────────────────────────────── 📜 Opciones post-ejecución ───────────────────────────────────────────
+1. Ver log (loguru)
+2. Ver lista negra
+3. Continuar ejecución
+0. Salir
+Opción [0/1/2/3] (0): 0
+
+1. 🤖 INICIAR AGENTE AUTÓNOMO
+2. 📡 Operaciones API (manual)
+0. Salir
+
+Opción [0/1/2] (1): 2
+────────────────────────────────────────── 📡 Operaciones API (manual) ───────────────────────────────────────────
+1. Ver mi información
+2. Ver jugadores
+3. Crear alias
+4. Eliminar alias
+5. Enviar carta
+6. Enviar paquete
+7. Eliminar carta
+0. Volver
+Opción [0/1/2/3/4/5/6/7] (0): 1
+2026-02-10 16:34:54.175 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+────────────────────────────────────────── 📡 Operaciones API (manual) ───────────────────────────────────────────
+1. Ver mi información
+2. Ver jugadores
+3. Crear alias
+4. Eliminar alias
+5. Enviar carta
+6. Enviar paquete
+7. Eliminar carta
+0. Volver
+Opción [0/1/2/3/4/5/6/7] (0): 1
+2026-02-10 16:34:59.471 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+────────────────────────────────────────── 📡 Operaciones API (manual) ───────────────────────────────────────────
+1. Ver mi información
+2. Ver jugadores
+3. Crear alias
+4. Eliminar alias
+5. Enviar carta
+6. Enviar paquete
+7. Eliminar carta
+0. Volver
+Opción [0/1/2/3/4/5/6/7] (0): 
