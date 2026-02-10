@@ -45,12 +45,7 @@ Usa un modelo de IA local (Ollama) para analizar mensajes, detectar estafas, ace
 # Clonar o entrar en el directorio del proyecto
 cd pln/
 
-# Crear entorno virtual e instalar dependencias (con uv)
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-
-# O directamente con uv sync (si usas pyproject.toml)
+# Instalar dependencias con uv
 uv sync
 ```
 
@@ -66,16 +61,16 @@ ollama serve   # si no está corriendo ya
 ## 🚀 Inicio rápido
 
 ```bash
-cd app/
+# Desde la raíz del proyecto:
 
 # Modo interactivo (menú con opciones)
-python main.py
+uv run app/main.py
 
 # Lanzar un bot directo por línea de comandos
-python main.py --alias MiBot --debug
+uv run app/main.py --alias MiBot --debug
 
 # Lanzar 3 bots en paralelo
-python test_runner.py -n 3
+uv run app/test_runner.py -n 3
 ```
 
 ---
@@ -89,7 +84,7 @@ Punto de entrada principal. Tiene dos modos:
 #### Modo interactivo (sin flags)
 
 ```bash
-python main.py
+uv run app/main.py
 ```
 
 Abre un menú donde puedes:
@@ -99,7 +94,7 @@ Abre un menú donde puedes:
 #### Modo automático (con `--alias`)
 
 ```bash
-python main.py --alias Bot_1 --modelo llama3.2:3b --debug --max-rondas 15 --pausa 20
+uv run app/main.py --alias Bot_1 --modelo llama3.2:3b --debug --max-rondas 15 --pausa 20
 ```
 
 Lanza el bot directamente sin menú interactivo.
@@ -121,13 +116,13 @@ Lanza el bot directamente sin menú interactivo.
 
 ```bash
 # Bot con modelo rápido y debug
-python main.py -a Bot_1 -m llama3.2:3b -d
+uv run app/main.py -a Bot_1 -m llama3.2:3b -d
 
 # Bot silencioso, 20 rondas, pausa corta
-python main.py -a Negociador -r 20 -p 10
+uv run app/main.py -a Negociador -r 20 -p 10
 
 # Bot conectado a otro servidor
-python main.py -a Bot_1 --api-url http://192.168.1.100:7719
+uv run app/main.py -a Bot_1 --api-url http://192.168.1.100:7719
 ```
 
 ---
@@ -137,7 +132,7 @@ python main.py -a Bot_1 --api-url http://192.168.1.100:7719
 Lanza N bots en paralelo, cada uno como un subproceso independiente de `main.py`.
 
 ```bash
-python test_runner.py -n 5 --consola
+uv run app/test_runner.py -n 5 --consola
 ```
 
 #### Flags de `test_runner.py`
