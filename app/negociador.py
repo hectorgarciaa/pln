@@ -445,30 +445,27 @@ class AgenteNegociador:
                         and self.ronda_actual - self.propuestas_enviadas[clave] < 2:
                     continue
 
-                cantidad_pido = min(necesidades[recurso_pido], 2)
-                cantidad_ofrezco = min(exc_disp[recurso_ofrezco], cantidad_pido + 1)
-                if cantidad_ofrezco < 1:
+                cantidad = 1  # intercambio 1:1
+                if exc_disp[recurso_ofrezco] < cantidad:
                     continue
-                ofrezco = {recurso_ofrezco: cantidad_ofrezco}
-                pido = {recurso_pido: cantidad_pido}
+                ofrezco = {recurso_ofrezco: cantidad}
+                pido = {recurso_pido: cantidad}
                 self.propuesta_index = idx + 1
                 break
             else:
                 # Todas las combinaciones de excedentes agotadas →
                 # intentar ofrecer oro como fallback (probar TODAS las necesidades)
                 encontrado = False
-                if necesidades and oro > 2:
+                if necesidades and oro >= 1:
                     comprometidos = self._recursos_comprometidos()
                     oro_libre = oro - comprometidos.get("oro", 0)
                     for recurso_pido in necesidades:
                         clave = (destinatario, "oro", recurso_pido)
                         if self._rechazo_vigente(clave):
                             continue
-                        cantidad_pido = min(necesidades[recurso_pido], 2)
-                        precio = cantidad_pido * 2
-                        if oro_libre >= precio:
-                            ofrezco = {"oro": min(precio, oro_libre)}
-                            pido = {recurso_pido: cantidad_pido}
+                        if oro_libre >= 1:
+                            ofrezco = {"oro": 1}
+                            pido = {recurso_pido: 1}
                             encontrado = True
                             break
                 if not encontrado:
@@ -479,7 +476,7 @@ class AgenteNegociador:
                                "oro_libre": oro - comprometidos.get('oro', 0)})
                     return None
 
-        elif necesidades and oro > 2:
+        elif necesidades and oro >= 1:
             # Sin excedentes → solo oro. Probar todas las necesidades.
             comprometidos = self._recursos_comprometidos()
             oro_libre = oro - comprometidos.get("oro", 0)
@@ -488,11 +485,9 @@ class AgenteNegociador:
                 clave = (destinatario, "oro", recurso_pido)
                 if self._rechazo_vigente(clave):
                     continue
-                cantidad_pido = min(necesidades[recurso_pido], 2)
-                precio = cantidad_pido * 2
-                if oro_libre >= precio:
-                    ofrezco = {"oro": min(precio, oro_libre)}
-                    pido = {recurso_pido: cantidad_pido}
+                if oro_libre >= 1:
+                    ofrezco = {"oro": 1}
+                    pido = {recurso_pido: 1}
                     encontrado = True
                     break
             if not encontrado:
@@ -502,9 +497,8 @@ class AgenteNegociador:
             clave = (destinatario, recurso_ofrezco, "oro")
             if self._rechazo_vigente(clave):
                 return None
-            cantidad_ofrezco = min(exc_disp[recurso_ofrezco], 3)
-            ofrezco = {recurso_ofrezco: cantidad_ofrezco}
-            pido = {"oro": cantidad_ofrezco}
+            ofrezco = {recurso_ofrezco: 1}
+            pido = {"oro": 1}
         else:
             return None
 
@@ -535,25 +529,24 @@ class AgenteNegociador:
         Verifica recursos disponibles (no comprometidos) antes de prometer.
         Comprueba que no sea una contraoferta ya rechazada.
         """
+        # Buscar UN recurso que nos ofrezcan y necesitemos
         pido = {}
         for rec, cant in ofrecen.items():
             if rec in necesidades:
-                pido[rec] = min(cant, necesidades[rec])
+                pido[rec] = 1  # 1:1
+                break
         if not pido:
             return None
 
         # Usar excedentes disponibles (descontando comprometidos)
         exc_disp = self._excedentes_disponibles(excedentes)
 
+        # Ofrecer UN recurso excedente a cambio
         ofrezco = {}
-        cantidad_total_pido = sum(pido.values())
-        cantidad_ofrecida = 0
         for rec, cant in exc_disp.items():
-            if cantidad_ofrecida >= cantidad_total_pido + 1:
+            if cant >= 1:
+                ofrezco[rec] = 1  # 1:1
                 break
-            c = min(cant, cantidad_total_pido + 1 - cantidad_ofrecida)
-            ofrezco[rec] = c
-            cantidad_ofrecida += c
 
         # Si no hay excedentes, intentar pagar con oro
         if not ofrezco:
@@ -561,9 +554,8 @@ class AgenteNegociador:
             oro_total = recursos.get("oro", 0)
             comprometidos = self._recursos_comprometidos()
             oro_libre = oro_total - comprometidos.get("oro", 0)
-            precio = cantidad_total_pido * 2
-            if oro_libre >= precio:
-                ofrezco = {"oro": precio}
+            if oro_libre >= 1:
+                ofrezco = {"oro": 1}
             else:
                 return None
 
@@ -772,7 +764,7 @@ class AgenteNegociador:
         ofrezco: Dict[str, int] = {}
         for rec in recursos_que_quiere:
             if rec in exc_disp and exc_disp[rec] > 0:
-                ofrezco[rec] = min(exc_disp[rec], 2)
+                ofrezco[rec] = 1  # 1:1
                 break  # un recurso por propuesta
 
         if not ofrezco:
@@ -783,7 +775,7 @@ class AgenteNegociador:
         for rec, cant in necesidades.items():
             clave = (destinatario, list(ofrezco.keys())[0], rec)
             if not self._rechazo_vigente(clave):
-                pido[rec] = min(cant, 2)
+                pido[rec] = 1  # 1:1
                 break
 
         if not pido:
