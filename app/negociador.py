@@ -189,8 +189,10 @@ class AgenteNegociador:
         # Memoria de propuestas y rechazos
         # clave = (destinatario, recurso_ofrezco, recurso_pido), valor = ronda
         self.propuestas_enviadas: Dict[tuple, int] = {}
-        # clave = (destinatario, recurso_ofrezco, recurso_pido)
-        self.rechazos_recibidos: set = set()
+        # clave = (destinatario, recurso_ofrezco, recurso_pido), valor = ronda
+        # Expiran tras RECHAZO_TTL rondas para reintentar con nuevas condiciones
+        self.rechazos_recibidos: Dict[tuple, int] = {}
+        self.RECHAZO_TTL: int = 1  # rondas antes de reintentar un combo rechazado
 
         # Configuración
         self.pausa_entre_acciones = 1
@@ -333,6 +335,8 @@ class AgenteNegociador:
             return False, "oferta incompleta (falta ofrecen o piden)"
 
         me_ofrecen_lo_que_necesito = any(r in necesidades for r in ofrecen)
+        # Oro siempre es útil (moneda universal), aunque no esté en necesidades
+        me_ofrecen_oro = "oro" in ofrecen and ofrecen["oro"] > 0
         piden_solo_excedentes = all(
             r in excedentes and excedentes[r] >= c
             for r, c in piden.items() if c > 0
@@ -340,7 +344,10 @@ class AgenteNegociador:
 
         if me_ofrecen_lo_que_necesito and piden_solo_excedentes:
             return True, "ofrecen lo que necesito y piden lo que me sobra"
-        if not me_ofrecen_lo_que_necesito:
+        # Aceptar oro a cambio de excedentes (oro siempre tiene valor)
+        if me_ofrecen_oro and piden_solo_excedentes:
+            return True, "ofrecen oro a cambio de lo que me sobra"
+        if not me_ofrecen_lo_que_necesito and not me_ofrecen_oro:
             return False, "no ofrecen nada de lo que necesito"
         return False, "piden recursos que no me sobran o no tengo suficientes"
 
@@ -373,15 +380,48 @@ class AgenteNegociador:
     # GENERACIÓN DE PROPUESTAS
     # =====================================================================
 
+    def _recursos_comprometidos(self) -> Dict[str, int]:
+        """Calcula recursos ya prometidos en acuerdos pendientes.
+
+        Suma todos los recursos_dar de todos los acuerdos pendientes
+        para saber cuánto tenemos realmente disponible.
+        """
+        comprometidos: Dict[str, int] = {}
+        for acuerdos in self.acuerdos_pendientes.values():
+            for acuerdo in acuerdos:
+                for rec, cant in acuerdo.get("recursos_dar", {}).items():
+                    comprometidos[rec] = comprometidos.get(rec, 0) + cant
+        return comprometidos
+
+    def _excedentes_disponibles(self, excedentes: Dict[str, int]) -> Dict[str, int]:
+        """Excedentes reales descontando recursos ya comprometidos."""
+        comprometidos = self._recursos_comprometidos()
+        disponibles = {}
+        for rec, cant in excedentes.items():
+            libre = cant - comprometidos.get(rec, 0)
+            if libre > 0:
+                disponibles[rec] = libre
+        return disponibles
+
+    def _rechazo_vigente(self, clave: tuple) -> bool:
+        """Comprueba si un rechazo sigue vigente (no ha expirado)."""
+        if clave not in self.rechazos_recibidos:
+            return False
+        ronda_rechazo = self.rechazos_recibidos[clave]
+        return (self.ronda_actual - ronda_rechazo) < self.RECHAZO_TTL
+
     def _generar_propuesta(self, destinatario: str, necesidades: Dict,
                            excedentes: Dict, oro: int) -> Optional[Dict[str, str]]:
         """Genera una propuesta evitando combinaciones ya enviadas o rechazadas."""
         ofrezco: Dict[str, int] = {}
         pido: Dict[str, int] = {}
 
-        if excedentes and necesidades:
+        # Usar excedentes reales (descontando recursos comprometidos)
+        exc_disp = self._excedentes_disponibles(excedentes)
+
+        if exc_disp and necesidades:
             lista_necesidades = list(necesidades.keys())
-            lista_excedentes = list(excedentes.keys())
+            lista_excedentes = list(exc_disp.keys())
             total_combos = len(lista_necesidades) * len(lista_excedentes)
 
             # Probar todas las combinaciones de (excedente, necesidad)
@@ -395,15 +435,15 @@ class AgenteNegociador:
                 recurso_pido = lista_necesidades[idx_pido]
                 clave = (destinatario, recurso_ofrezco, recurso_pido)
 
-                # Saltar si ya fue rechazada o ya enviada esta ronda
-                if clave in self.rechazos_recibidos:
+                # Saltar si ya fue rechazada (y no ha expirado) o ya enviada esta ronda
+                if self._rechazo_vigente(clave):
                     continue
                 if clave in self.propuestas_enviadas \
                         and self.propuestas_enviadas[clave] >= self.ronda_actual - 1:
                     continue
 
                 cantidad_pido = min(necesidades[recurso_pido], 2)
-                cantidad_ofrezco = min(excedentes[recurso_ofrezco], cantidad_pido + 1)
+                cantidad_ofrezco = min(exc_disp[recurso_ofrezco], cantidad_pido + 1)
                 if cantidad_ofrezco < 1:
                     continue
                 ofrezco = {recurso_ofrezco: cantidad_ofrezco}
@@ -411,25 +451,51 @@ class AgenteNegociador:
                 self.propuesta_index = idx + 1
                 break
             else:
-                # Todas las combinaciones agotadas para este destinatario
-                self._log("INFO", f"Sin combinaciones nuevas para {destinatario}")
-                return None
+                # Todas las combinaciones de excedentes agotadas →
+                # intentar ofrecer oro como fallback (probar TODAS las necesidades)
+                encontrado = False
+                if necesidades and oro > 2:
+                    comprometidos = self._recursos_comprometidos()
+                    oro_libre = oro - comprometidos.get("oro", 0)
+                    for recurso_pido in necesidades:
+                        clave = (destinatario, "oro", recurso_pido)
+                        if self._rechazo_vigente(clave):
+                            continue
+                        cantidad_pido = min(necesidades[recurso_pido], 2)
+                        precio = cantidad_pido * 2
+                        if oro_libre >= precio:
+                            ofrezco = {"oro": min(precio, oro_libre)}
+                            pido = {recurso_pido: cantidad_pido}
+                            encontrado = True
+                            break
+                if not encontrado:
+                    self._log("INFO", f"Sin combinaciones nuevas para {destinatario}")
+                    return None
 
         elif necesidades and oro > 2:
-            recurso_pido = list(necesidades.keys())[0]
-            clave = (destinatario, "oro", recurso_pido)
-            if clave in self.rechazos_recibidos:
+            # Sin excedentes → solo oro. Probar todas las necesidades.
+            comprometidos = self._recursos_comprometidos()
+            oro_libre = oro - comprometidos.get("oro", 0)
+            encontrado = False
+            for recurso_pido in necesidades:
+                clave = (destinatario, "oro", recurso_pido)
+                if self._rechazo_vigente(clave):
+                    continue
+                cantidad_pido = min(necesidades[recurso_pido], 2)
+                precio = cantidad_pido * 2
+                if oro_libre >= precio:
+                    ofrezco = {"oro": min(precio, oro_libre)}
+                    pido = {recurso_pido: cantidad_pido}
+                    encontrado = True
+                    break
+            if not encontrado:
                 return None
-            cantidad_pido = min(necesidades[recurso_pido], 2)
-            precio = cantidad_pido * 2
-            ofrezco = {"oro": min(precio, oro)}
-            pido = {recurso_pido: cantidad_pido}
-        elif excedentes:
-            recurso_ofrezco = list(excedentes.keys())[0]
+        elif exc_disp:
+            recurso_ofrezco = list(exc_disp.keys())[0]
             clave = (destinatario, recurso_ofrezco, "oro")
-            if clave in self.rechazos_recibidos:
+            if self._rechazo_vigente(clave):
                 return None
-            cantidad_ofrezco = min(excedentes[recurso_ofrezco], 3)
+            cantidad_ofrezco = min(exc_disp[recurso_ofrezco], 3)
             ofrezco = {recurso_ofrezco: cantidad_ofrezco}
             pido = {"oro": cantidad_ofrezco}
         else:
@@ -457,7 +523,11 @@ class AgenteNegociador:
     def _generar_contraoferta(self, destinatario: str,
                               ofrecen: Dict[str, int],
                               necesidades: Dict, excedentes: Dict) -> Optional[Dict]:
-        """Genera contraoferta cuando la oferta original no nos sirve."""
+        """Genera contraoferta cuando la oferta original no nos sirve.
+
+        Verifica recursos disponibles (no comprometidos) antes de prometer.
+        Comprueba que no sea una contraoferta ya rechazada.
+        """
         pido = {}
         for rec, cant in ofrecen.items():
             if rec in necesidades:
@@ -465,17 +535,38 @@ class AgenteNegociador:
         if not pido:
             return None
 
+        # Usar excedentes disponibles (descontando comprometidos)
+        exc_disp = self._excedentes_disponibles(excedentes)
+
         ofrezco = {}
         cantidad_total_pido = sum(pido.values())
         cantidad_ofrecida = 0
-        for rec, cant in excedentes.items():
+        for rec, cant in exc_disp.items():
             if cantidad_ofrecida >= cantidad_total_pido + 1:
                 break
             c = min(cant, cantidad_total_pido + 1 - cantidad_ofrecida)
             ofrezco[rec] = c
             cantidad_ofrecida += c
+
+        # Si no hay excedentes, intentar pagar con oro
         if not ofrezco:
-            return None
+            recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+            oro_total = recursos.get("oro", 0)
+            comprometidos = self._recursos_comprometidos()
+            oro_libre = oro_total - comprometidos.get("oro", 0)
+            precio = cantidad_total_pido * 2
+            if oro_libre >= precio:
+                ofrezco = {"oro": precio}
+            else:
+                return None
+
+        # Comprobar que no sea una contraoferta ya rechazada (vigente)
+        for r_o in ofrezco:
+            for r_p in pido:
+                if self._rechazo_vigente((destinatario, r_o, r_p)):
+                    self._log("INFO", f"Contraoferta a {destinatario} ya rechazada: "
+                              f"{r_o}→{r_p} — no repetir")
+                    return None
 
         ofrezco_str = ", ".join(f"{c} {r}" for r, c in ofrezco.items())
         pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
@@ -564,24 +655,57 @@ class AgenteNegociador:
         return exito
 
     def _responder_aceptacion(self, remitente: str, mensaje_original: str) -> bool:
-        """Responde a una aceptación enviando los recursos acordados."""
-        if remitente in self.acuerdos_pendientes and self.acuerdos_pendientes[remitente]:
-            acuerdo = self.acuerdos_pendientes[remitente].pop(0)
-            recursos_a_enviar = acuerdo.get("recursos_dar", {})
+        """Responde a una aceptación enviando los recursos acordados.
 
-            if not self.acuerdos_pendientes[remitente]:
-                del self.acuerdos_pendientes[remitente]
+        Intenta buscar el acuerdo pendiente que mejor coincida con lo que
+        el remitente menciona en su mensaje de aceptación.
+        Verifica que los recursos sigan disponibles antes de enviar.
+        """
+        if remitente not in self.acuerdos_pendientes or not self.acuerdos_pendientes[remitente]:
+            self._log("INFO", f"Aceptación de {remitente} sin acuerdo pendiente registrado")
+            return False
 
-            if recursos_a_enviar:
-                self._log("DECISION", f"Ejecutando acuerdo con {remitente}: envío {recursos_a_enviar}")
-                self._actualizar_estado()
-                if self._enviar_paquete(remitente, recursos_a_enviar):
-                    return True
-                else:
-                    self._log("ERROR", f"No se pudo enviar paquete a {remitente}")
+        # Intentar encontrar el acuerdo que coincide con el mensaje
+        acuerdo_idx = 0
+        msg_lower = mensaje_original.lower()
+        acuerdos = self.acuerdos_pendientes[remitente]
+        for i, ac in enumerate(acuerdos):
+            # Si el mensaje menciona algún recurso del acuerdo, preferirlo
+            for rec in ac.get("recursos_dar", {}):
+                if rec in msg_lower:
+                    acuerdo_idx = i
+                    break
+            for rec in ac.get("recursos_pedir", {}):
+                if rec in msg_lower:
+                    acuerdo_idx = i
+                    break
 
-        self._log("INFO", f"Aceptación de {remitente} sin acuerdo pendiente registrado")
-        return False
+        acuerdo = acuerdos.pop(acuerdo_idx)
+        if not acuerdos:
+            del self.acuerdos_pendientes[remitente]
+
+        recursos_a_enviar = acuerdo.get("recursos_dar", {})
+        if not recursos_a_enviar:
+            self._log("INFO", f"Acuerdo con {remitente} sin recursos a enviar")
+            return False
+
+        # Verificar disponibilidad real ANTES de enviar
+        self._actualizar_estado()
+        mis_recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+        for rec, cant in recursos_a_enviar.items():
+            disponible = mis_recursos.get(rec, 0)
+            if disponible < cant:
+                self._log("ALERTA",
+                          f"No puedo cumplir acuerdo con {remitente}: "
+                          f"necesito {cant} {rec} pero solo tengo {disponible}")
+                return False
+
+        self._log("DECISION", f"Ejecutando acuerdo con {remitente}: envío {recursos_a_enviar}")
+        if self._enviar_paquete(remitente, recursos_a_enviar):
+            return True
+        else:
+            self._log("ERROR", f"No se pudo enviar paquete a {remitente}")
+            return False
 
     # =====================================================================
     # LOOP PRINCIPAL
@@ -663,28 +787,55 @@ class AgenteNegociador:
             return False
         return bool(self._RE_ACEPTACION.search(mensaje))
 
-    # Regex para extraer recursos del asunto de propuestas
+    # Regex para extraer recursos del asunto de propuestas y contraofertas
     # Captura "mi X recurso por tu Y recurso" del asunto
     _RE_ASUNTO_PROPUESTA = _re.compile(
-        r'(?:mi|Propuesta:?\s*mi)\s+.*?(\w+)\s+por\s+tu\s+.*?(\w+)',
+        r'(?:mi|Propuesta:?\s*mi|Contrapropuesta:?\s*mi)\s+.*?(\w+)\s+por\s+tu\s+.*?(\w+)',
         _re.IGNORECASE,
+    )
+
+    # Regex más detallada: extrae TODOS los recursos del asunto
+    # Captura múltiples "N recurso" antes y después del "por tu"
+    _RE_ASUNTO_RECURSOS = _re.compile(
+        r'mi\s+(.+?)\s+por\s+tu\s+(.+?)\s*$',
+        _re.IGNORECASE,
+    )
+    _RE_RECURSO_INDIVIDUAL = _re.compile(
+        r'(\d+)\s+(\w+)',
     )
 
     def _registrar_rechazo(self, remitente: str, asunto: str):
         """Registra un rechazo del remitente extrayendo los recursos del asunto.
 
-        El asunto suele ser 'Re: Propuesta: mi 2 madera por tu 3 queso',
-        así extraemos (remitente, recurso_ofrecido, recurso_pedido) y lo marcamos
-        como rechazado para no volver a proponer lo mismo.
+        Funciona tanto con propuestas como contraofertas:
+        - 'Re: Propuesta: mi 2 madera por tu 3 queso'
+        - 'Re: Contrapropuesta: mi 3 piedra, 1 queso por tu 3 trigo'
         """
-        # El asunto es del tipo "Re: Propuesta: mi X recurso por tu Y recurso"
-        # Nuestro ofrezco es lo que aparece como "mi ..." y nuestro pido "tu ..."
+        # Intentar extraer todos los recursos del asunto
+        m = self._RE_ASUNTO_RECURSOS.search(asunto)
+        if m:
+            parte_ofrezco = m.group(1)
+            parte_pido = m.group(2)
+            recs_ofrezco = self._RE_RECURSO_INDIVIDUAL.findall(parte_ofrezco)
+            recs_pido = self._RE_RECURSO_INDIVIDUAL.findall(parte_pido)
+            for _, r_o in recs_ofrezco:
+                for _, r_p in recs_pido:
+                    clave = (remitente, r_o.lower(), r_p.lower())
+                    self.rechazos_recibidos[clave] = self.ronda_actual
+            if recs_ofrezco and recs_pido:
+                ofr_str = ", ".join(r for _, r in recs_ofrezco)
+                pid_str = ", ".join(r for _, r in recs_pido)
+                self._log("INFO", f"Rechazo registrado de {remitente}: "
+                          f"{ofr_str}→{pid_str} (no repetir)")
+                return
+
+        # Fallback: regex simple
         m = self._RE_ASUNTO_PROPUESTA.search(asunto)
         if m:
             recurso_ofrezco = m.group(1).lower()
             recurso_pido = m.group(2).lower()
             clave = (remitente, recurso_ofrezco, recurso_pido)
-            self.rechazos_recibidos.add(clave)
+            self.rechazos_recibidos[clave] = self.ronda_actual
             self._log("INFO", f"Rechazo registrado de {remitente}: "
                       f"{recurso_ofrezco}→{recurso_pido} (no repetir)")
 
@@ -701,7 +852,7 @@ class AgenteNegociador:
                 # Desde la perspectiva del remitente: él ofrece r_o y pide r_p
                 # Si nosotros le proponemos r_p→r_o sería redundante
                 clave = (remitente, r_p, r_o)
-                self.rechazos_recibidos.add(clave)
+                self.rechazos_recibidos[clave] = self.ronda_actual
 
     def _procesar_buzon(self, necesidades: Dict, excedentes: Dict) -> int:
         """Procesa todas las cartas del buzón usando IA para lenguaje natural."""
@@ -879,8 +1030,6 @@ class AgenteNegociador:
         if not jugadores:
             self._log("INFO", "No hay jugadores a quienes enviar propuestas esta ronda")
             return
-
-        jugadores = jugadores[:3]
 
         for jugador in jugadores:
             propuesta = self._generar_propuesta(jugador, necesidades, excedentes, oro)
