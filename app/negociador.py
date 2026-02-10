@@ -186,6 +186,12 @@ class AgenteNegociador:
         self.ronda_actual: int = 0
         self.propuesta_index: int = 0
 
+        # Memoria de propuestas y rechazos
+        # clave = (destinatario, recurso_ofrezco, recurso_pido), valor = ronda
+        self.propuestas_enviadas: Dict[tuple, int] = {}
+        # clave = (destinatario, recurso_ofrezco, recurso_pido)
+        self.rechazos_recibidos: set = set()
+
         # Configuración
         self.pausa_entre_acciones = 1
         self.pausa_entre_rondas = 30
@@ -369,30 +375,58 @@ class AgenteNegociador:
 
     def _generar_propuesta(self, destinatario: str, necesidades: Dict,
                            excedentes: Dict, oro: int) -> Optional[Dict[str, str]]:
-        """Genera una propuesta con etiquetas [OFREZCO] / [PIDO]."""
+        """Genera una propuesta evitando combinaciones ya enviadas o rechazadas."""
         ofrezco: Dict[str, int] = {}
         pido: Dict[str, int] = {}
 
         if excedentes and necesidades:
             lista_necesidades = list(necesidades.keys())
             lista_excedentes = list(excedentes.keys())
-            idx_pido = self.propuesta_index % len(lista_necesidades)
-            idx_ofrezco = self.propuesta_index % len(lista_excedentes)
-            self.propuesta_index += 1
-            recurso_pido = lista_necesidades[idx_pido]
-            cantidad_pido = min(necesidades[recurso_pido], 3)
-            recurso_ofrezco = lista_excedentes[idx_ofrezco]
-            cantidad_ofrezco = min(excedentes[recurso_ofrezco], cantidad_pido + 1)
-            ofrezco = {recurso_ofrezco: cantidad_ofrezco}
-            pido = {recurso_pido: cantidad_pido}
+            total_combos = len(lista_necesidades) * len(lista_excedentes)
+
+            # Probar todas las combinaciones de (excedente, necesidad)
+            # empezando desde propuesta_index para rotar
+            for offset in range(total_combos):
+                idx = (self.propuesta_index + offset) % total_combos
+                idx_ofrezco = idx // len(lista_necesidades)
+                idx_pido = idx % len(lista_necesidades)
+
+                recurso_ofrezco = lista_excedentes[idx_ofrezco]
+                recurso_pido = lista_necesidades[idx_pido]
+                clave = (destinatario, recurso_ofrezco, recurso_pido)
+
+                # Saltar si ya fue rechazada o ya enviada esta ronda
+                if clave in self.rechazos_recibidos:
+                    continue
+                if clave in self.propuestas_enviadas \
+                        and self.propuestas_enviadas[clave] >= self.ronda_actual - 1:
+                    continue
+
+                cantidad_pido = min(necesidades[recurso_pido], 3)
+                cantidad_ofrezco = min(excedentes[recurso_ofrezco], cantidad_pido + 1)
+                ofrezco = {recurso_ofrezco: cantidad_ofrezco}
+                pido = {recurso_pido: cantidad_pido}
+                self.propuesta_index = idx + 1
+                break
+            else:
+                # Todas las combinaciones agotadas para este destinatario
+                self._log("INFO", f"Sin combinaciones nuevas para {destinatario}")
+                return None
+
         elif necesidades and oro > 2:
             recurso_pido = list(necesidades.keys())[0]
+            clave = (destinatario, "oro", recurso_pido)
+            if clave in self.rechazos_recibidos:
+                return None
             cantidad_pido = min(necesidades[recurso_pido], 2)
             precio = cantidad_pido * 2
             ofrezco = {"oro": min(precio, oro)}
             pido = {recurso_pido: cantidad_pido}
         elif excedentes:
             recurso_ofrezco = list(excedentes.keys())[0]
+            clave = (destinatario, recurso_ofrezco, "oro")
+            if clave in self.rechazos_recibidos:
+                return None
             cantidad_ofrezco = min(excedentes[recurso_ofrezco], 3)
             ofrezco = {recurso_ofrezco: cantidad_ofrezco}
             pido = {"oro": cantidad_ofrezco}
@@ -591,9 +625,62 @@ class AgenteNegociador:
             return not self._RE_PROPUESTA.search(limpio)
         return False
 
-    def _es_aceptacion_simple(self, mensaje: str) -> bool:
-        """Detecta aceptaciones textuales sin necesidad de IA."""
+    def _es_aceptacion_simple(self, mensaje: str, asunto: str = "") -> bool:
+        """Detecta aceptaciones textuales sin necesidad de IA.
+
+        NO activa para propuestas nuevas (asunto 'Propuesta:' o
+        'Contrapropuesta:') ni cuando el cuerpo contiene una propuesta
+        de intercambio, ya que esos mensajes incluyen la frase
+        'acepto el trato' como instrucción, no como aceptación real.
+        """
+        # Si el asunto indica propuesta nueva → no es aceptación
+        asunto_limpio = asunto.strip().lower()
+        if asunto_limpio.startswith(("propuesta:", "contrapropuesta:")):
+            return False
+        # Si el cuerpo contiene una propuesta de intercambio → no es aceptación
+        if self._RE_PROPUESTA.search(mensaje):
+            return False
         return bool(self._RE_ACEPTACION.search(mensaje))
+
+    # Regex para extraer recursos del asunto de propuestas
+    # Captura "mi X recurso por tu Y recurso" del asunto
+    _RE_ASUNTO_PROPUESTA = _re.compile(
+        r'(?:mi|Propuesta:?\s*mi)\s+.*?(\w+)\s+por\s+tu\s+.*?(\w+)',
+        _re.IGNORECASE,
+    )
+
+    def _registrar_rechazo(self, remitente: str, asunto: str):
+        """Registra un rechazo del remitente extrayendo los recursos del asunto.
+
+        El asunto suele ser 'Re: Propuesta: mi 2 madera por tu 3 queso',
+        así extraemos (remitente, recurso_ofrecido, recurso_pedido) y lo marcamos
+        como rechazado para no volver a proponer lo mismo.
+        """
+        # El asunto es del tipo "Re: Propuesta: mi X recurso por tu Y recurso"
+        # Nuestro ofrezco es lo que aparece como "mi ..." y nuestro pido "tu ..."
+        m = self._RE_ASUNTO_PROPUESTA.search(asunto)
+        if m:
+            recurso_ofrezco = m.group(1).lower()
+            recurso_pido = m.group(2).lower()
+            clave = (remitente, recurso_ofrezco, recurso_pido)
+            self.rechazos_recibidos.add(clave)
+            self._log("INFO", f"Rechazo registrado de {remitente}: "
+                      f"{recurso_ofrezco}→{recurso_pido} (no repetir)")
+
+    def _registrar_rechazo_propio(self, remitente: str,
+                                   ofrecen: Dict[str, int],
+                                   piden: Dict[str, int]):
+        """Registra que NOSOTROS rechazamos una oferta de remitente.
+
+        Lo guardamos al revés: si remitente nos ofrece madera y pide queso,
+        no tiene sentido que nosotros le propongamos queso por madera.
+        """
+        for r_o in ofrecen:
+            for r_p in piden:
+                # Desde la perspectiva del remitente: él ofrece r_o y pide r_p
+                # Si nosotros le proponemos r_p→r_o sería redundante
+                clave = (remitente, r_p, r_o)
+                self.rechazos_recibidos.add(clave)
 
     def _procesar_buzon(self, necesidades: Dict, excedentes: Dict) -> int:
         """Procesa todas las cartas del buzón usando IA para lenguaje natural."""
@@ -630,6 +717,7 @@ class AgenteNegociador:
             # ── Filtro 1: rechazos simples → no gastar IA ──
             if self._es_rechazo_simple(mensaje):
                 self._log("INFO", f"Rechazo de {remitente} — ignorado (sin IA)")
+                self._registrar_rechazo(remitente, asunto)
                 cartas_procesadas.append(uid)
                 continue
 
@@ -640,7 +728,7 @@ class AgenteNegociador:
                 continue
 
             # ── Filtro 3: aceptaciones textuales → sin IA ──
-            if self._es_aceptacion_simple(mensaje):
+            if self._es_aceptacion_simple(mensaje, asunto):
                 self._log("ANALISIS", f"{remitente} ACEPTA intercambio (detectado por texto, sin IA)")
                 if self._responder_aceptacion(remitente, mensaje):
                     intercambios += 1
@@ -722,6 +810,8 @@ class AgenteNegociador:
 
             elif r.ofrecen or r.piden:
                 self._log("DECISION", f"RECHAZO oferta de {remitente} ({razon})")
+                # Registrar el rechazo que NOSOTROS hacemos para no repetir
+                self._registrar_rechazo_propio(remitente, r.ofrecen, r.piden)
                 self._enviar_carta(
                     remitente, f"Re: {asunto}",
                     f"Gracias por la oferta, {remitente}, pero por ahora "
@@ -764,6 +854,12 @@ class AgenteNegociador:
                 if jugador not in self.acuerdos_pendientes:
                     self.acuerdos_pendientes[jugador] = []
                 self.acuerdos_pendientes[jugador].append(acuerdo)
+
+                # Registrar en memoria de propuestas
+                for r_o in propuesta["_ofrezco"]:
+                    for r_p in propuesta["_pido"]:
+                        self.propuestas_enviadas[(jugador, r_o, r_p)] = self.ronda_actual
+
                 self._log("INFO", f"Acuerdo pendiente con {jugador}: "
                           f"dar={propuesta['_ofrezco']}, pedir={propuesta['_pido']}")
 
