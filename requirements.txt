@@ -1,13 +1,26 @@
-# Requirements for Bot Negociador - PLN Project
-# Compatible with uv: https://github.com/astral-sh/uv
+# Requirements for Bot Negociador — PLN Project
+# Compatible con uv: https://github.com/astral-sh/uv
 #
-# Install with uv:
+# Instalar con uv:
 #   uv pip install -r requirements.txt
 #
-# Or create venv + install:
-#   uv venv
-#   source .venv/bin/activate  # Linux/Mac
-#   uv pip install -r requirements.txt
+# O crear venv + instalar:
+#   uv venv && source .venv/bin/activate && uv pip install -r requirements.txt
 
-# HTTP requests (API + Ollama)
+# ── HTTP (API del juego) ─────────────────────────────────────────────────
 requests>=2.32.5
+
+# ── Cliente de Ollama (IA local) ─────────────────────────────────────────
+ollama>=0.6.1
+
+# ── CLI moderna ──────────────────────────────────────────────────────────
+click>=8.3.1
+
+# ── Interfaz de terminal enriquecida ─────────────────────────────────────
+rich>=14.3.2
+
+# ── Logging estructurado ────────────────────────────────────────────────
+loguru>=0.7.3
+
+# ── Validación de datos ─────────────────────────────────────────────────
+pydantic>=2.12.5

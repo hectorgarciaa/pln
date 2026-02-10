@@ -1,309 +1,264 @@
 """
-Interfaz de usuario.
-Punto de entrada principal del programa.
+Interfaz de usuario — punto de entrada principal.
 
-Uso interactivo:
+Usa **click** para la CLI y **rich** para la interfaz de terminal.
+
+Uso interactivo (menú):
     python main.py
 
-Uso automático (para lanzar desde test_runner.py):
-    python main.py --alias Bot_1 --modelo llama3.2:3b --debug --max-rondas 10 --pausa 15
+Uso automático (lanzar bot directo):
+    python main.py --alias Bot_1 --modelo llama3.2:3b --debug --max-rondas 10
 """
 
-import sys
-import argparse
 import json
+import sys
+
+import click
+from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt, IntPrompt, Confirm
+from rich.table import Table
+
 from negociador import AgenteNegociador
 from api_client import APIClient
 from config import MODELOS_DISPONIBLES, MODELO_DEFAULT
 
+console = Console()
 
-def menu_agente(alias: str):
-    """
-    Menú del bot negociador autónomo (modo interactivo).
-    """
-    print("\n" + "="*60)
-    print("🤖 CONFIGURACIÓN DEL AGENTE")
-    print("="*60)
-    
-    # Modelo
-    print(f"\n1. Modelo de IA:")
-    for key, (modelo, desc) in MODELOS_DISPONIBLES.items():
-        marca = " ←" if modelo == MODELO_DEFAULT else ""
-        print(f"   {key}. {modelo:20} {desc}{marca}")
-    
-    opcion_modelo = input(f"\nSelecciona modelo (1-4) [default: 1]: ").strip() or "1"
-    modelo = MODELOS_DISPONIBLES.get(opcion_modelo, (MODELO_DEFAULT, ""))[0]
-    
-    # Debug
-    debug_input = input("\n¿Activar modo DEBUG? (s/n) [default: s]: ").strip().lower() or "s"
-    debug = debug_input == "s"
-    
-    # Max rondas
-    rondas_input = input("\nMáximo de rondas (default: 10): ").strip()
-    max_rondas = int(rondas_input) if rondas_input.isdigit() else 10
-    
-    # Pausa entre rondas
-    pausa_input = input("Segundos entre rondas (default: 30): ").strip()
-    pausa = int(pausa_input) if pausa_input.isdigit() else 30
-    
-    # Confirmar
-    print("\n" + "="*60)
-    print("📋 RESUMEN DE CONFIGURACIÓN")
-    print("="*60)
-    print(f"  Alias: {alias}")
-    print(f"  Modelo: {modelo}")
-    print(f"  Debug: {'ACTIVADO' if debug else 'desactivado'}")
-    print(f"  Max rondas: {max_rondas}")
-    print(f"  Pausa entre rondas: {pausa}s")
-    print("="*60)
-    
-    if input("\n¿Iniciar agente? (s/n): ").strip().lower() != 's':
+
+# =========================================================================
+# CLI  (click)
+# =========================================================================
+
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
+@click.option("--alias", "-a", default=None,
+              help="Nombre del bot.  Si se da, se ejecuta en modo automático (sin menú).")
+@click.option("--modelo", "-m", default=MODELO_DEFAULT, show_default=True,
+              help="Modelo de IA a usar.")
+@click.option("--debug", "-d", is_flag=True, default=False,
+              help="Activar modo debug (muestra cada decisión del agente).")
+@click.option("--max-rondas", "-r", default=10, show_default=True,
+              help="Rondas máximas de negociación.")
+@click.option("--pausa", "-p", default=30, show_default=True,
+              help="Segundos de espera entre rondas.")
+@click.option("--source-ip", default=None,
+              help="IP local de origen para el butler (sin bind por defecto).")
+@click.option("--api-url", default=None,
+              help="URL base de la API del juego.")
+def main(alias, modelo, debug, max_rondas, pausa, source_ip, api_url):
+    """🤖 Agente Negociador Autónomo para fdi-pln-butler."""
+
+    # ── Modo automático (CLI) ────────────────────────────────────────────
+    if alias:
+        console.print(f"[bold cyan]🤖 Iniciando bot '{alias}' en modo automático…[/]")
+        _ejecutar_agente(
+            alias=alias, modelo=modelo, debug=debug,
+            max_rondas=max_rondas, pausa=pausa,
+            interactivo=False, source_ip=source_ip, api_url=api_url,
+        )
         return
-    
+
+    # ── Modo interactivo (menú) ──────────────────────────────────────────
+    console.print(Panel.fit(
+        "[bold]🎮 SISTEMA DE NEGOCIACIÓN AUTÓNOMO[/bold]\n\n"
+        "El agente negociará automáticamente para:\n"
+        "  1️⃣  Conseguir los recursos objetivo\n"
+        "  2️⃣  Maximizar el oro vendiendo excedentes\n\n"
+        "Activando [bold]DEBUG[/] verás todo lo que hace el agente:\n"
+        "  📤 Cartas enviadas   📥 Cartas recibidas\n"
+        "  🔍 Análisis          🧠 Decisiones\n"
+        "  🔄 Intercambios",
+        border_style="bright_blue",
+    ))
+
+    while True:
+        console.print("\n[bold]1.[/] 🤖 INICIAR AGENTE AUTÓNOMO")
+        console.print("[bold]2.[/] 📡 Operaciones API (manual)")
+        console.print("[bold]0.[/] Salir")
+
+        opcion = Prompt.ask("\nOpción", choices=["0", "1", "2"], default="1")
+
+        if opcion == "1":
+            alias = Prompt.ask("\nTu alias para negociar")
+            if alias:
+                _menu_agente(alias)
+        elif opcion == "2":
+            _menu_api()
+        elif opcion == "0":
+            console.print("\n[dim]¡Hasta luego![/]")
+            break
+
+
+# =========================================================================
+# MENÚ DEL AGENTE (interactivo)
+# =========================================================================
+
+def _menu_agente(alias: str):
+    """Configura y lanza el bot en modo interactivo."""
+    console.rule("[bold]🤖 Configuración del Agente[/bold]")
+
+    # ── Modelo ───────────────────────────────────────────────────────────
+    table = Table(title="Modelos disponibles", show_header=True, border_style="cyan")
+    table.add_column("#", style="bold")
+    table.add_column("Modelo")
+    table.add_column("Descripción")
+
+    for key, (modelo, desc) in MODELOS_DISPONIBLES.items():
+        marca = " ← default" if modelo == MODELO_DEFAULT else ""
+        table.add_row(key, modelo, f"{desc}{marca}")
+
+    console.print(table)
+
+    opcion_modelo = Prompt.ask("Selecciona modelo", choices=list(MODELOS_DISPONIBLES), default="1")
+    modelo = MODELOS_DISPONIBLES[opcion_modelo][0]
+
+    # ── Opciones ─────────────────────────────────────────────────────────
+    debug = Confirm.ask("¿Activar modo DEBUG?", default=True)
+    max_rondas = IntPrompt.ask("Máximo de rondas", default=10)
+    pausa = IntPrompt.ask("Segundos entre rondas", default=30)
+
+    # ── Confirmar ────────────────────────────────────────────────────────
+    resumen = Table(title="📋 Resumen de Configuración", show_header=False,
+                    border_style="bright_blue", padding=(0, 2))
+    resumen.add_column("Campo", style="bold")
+    resumen.add_column("Valor")
+    resumen.add_row("Alias", alias)
+    resumen.add_row("Modelo", modelo)
+    resumen.add_row("Debug", "✅ ACTIVADO" if debug else "desactivado")
+    resumen.add_row("Max rondas", str(max_rondas))
+    resumen.add_row("Pausa", f"{pausa}s")
+
+    console.print(resumen)
+
+    if not Confirm.ask("\n¿Iniciar agente?", default=True):
+        return
+
     _ejecutar_agente(alias, modelo, debug, max_rondas, pausa, interactivo=True)
 
+
+# =========================================================================
+# EJECUTAR AGENTE
+# =========================================================================
 
 def _ejecutar_agente(alias: str, modelo: str, debug: bool,
                      max_rondas: int, pausa: int, interactivo: bool = False,
                      source_ip: str = None, api_url: str = None):
-    """
-    Crea y ejecuta el agente negociador.
-
-    Args:
-        alias: Nombre del bot.
-        modelo: Modelo de IA a usar.
-        debug: Activar modo debug.
-        max_rondas: Máximo de rondas.
-        pausa: Segundos entre rondas.
-        interactivo: Si True, muestra menú post-ejecución.
-        source_ip: IP local de origen para diferenciar jugadores en el butler.
-        api_url: URL base de la API del juego.
-    """
+    """Crea y ejecuta el agente negociador."""
     agente = AgenteNegociador(alias, modelo, debug, api_url=api_url, source_ip=source_ip)
     agente.pausa_entre_rondas = pausa
-    
+
     try:
         agente.ejecutar(max_rondas)
     except KeyboardInterrupt:
-        print("\n\n⏹️ Agente detenido por el usuario")
+        console.print("\n\n[yellow]⏹️ Agente detenido por el usuario[/]")
         agente._mostrar_resumen()
 
     if not interactivo:
         return
 
-    # Opciones post-ejecución (solo en modo interactivo)
+    # ── Post-ejecución ───────────────────────────────────────────────────
     while True:
-        print("\n" + "="*60)
-        print("📜 OPCIONES POST-EJECUCIÓN")
-        print("="*60)
-        print("1. Ver log completo")
-        print("2. Ver log (últimas 50)")
-        print("3. Ver lista negra")
-        print("4. Continuar ejecución")
-        print("0. Salir")
-        
-        opcion = input("\nOpción: ").strip()
-        
+        console.rule("[bold]📜 Opciones post-ejecución[/bold]")
+        console.print("[bold]1.[/] Ver log (loguru)")
+        console.print("[bold]2.[/] Ver lista negra")
+        console.print("[bold]3.[/] Continuar ejecución")
+        console.print("[bold]0.[/] Salir")
+
+        opcion = Prompt.ask("Opción", choices=["0", "1", "2", "3"], default="0")
+
         if opcion == "1":
-            agente.ver_log(len(agente.log))
+            agente.ver_log()
         elif opcion == "2":
-            agente.ver_log(50)
-        elif opcion == "3":
-            print("\n🛡️ LISTA NEGRA:")
             if agente.lista_negra:
                 for p in agente.lista_negra:
-                    print(f"  ⚠️ {p}")
+                    console.print(f"  ⚠️  {p}")
             else:
-                print("  (vacía)")
-        elif opcion == "4":
-            rondas = input("Rondas adicionales (default: 5): ").strip()
-            rondas = int(rondas) if rondas.isdigit() else 5
+                console.print("  [dim](vacía)[/]")
+        elif opcion == "3":
+            rondas = IntPrompt.ask("Rondas adicionales", default=5)
             try:
                 agente.ejecutar(rondas)
             except KeyboardInterrupt:
-                print("\n⏹️ Detenido")
+                console.print("\n[yellow]⏹️ Detenido[/]")
                 agente._mostrar_resumen()
         elif opcion == "0":
             break
 
 
-def menu_api():
+# =========================================================================
+# MENÚ API MANUAL
+# =========================================================================
+
+def _menu_api():
     """Menú para operaciones manuales de la API."""
     api = APIClient()
-    
+
     while True:
-        print("\n" + "="*60)
-        print("📡 OPERACIONES API (MANUAL)")
-        print("="*60)
-        print("1. Ver mi información")
-        print("2. Ver jugadores")
-        print("3. Crear alias")
-        print("4. Eliminar alias")
-        print("5. Enviar carta")
-        print("6. Enviar paquete")
-        print("7. Eliminar carta")
-        print("0. Volver")
-        print("="*60)
-        
-        opcion = input("\nOpción: ").strip()
-        
+        console.rule("[bold]📡 Operaciones API (manual)[/bold]")
+        console.print("[bold]1.[/] Ver mi información")
+        console.print("[bold]2.[/] Ver jugadores")
+        console.print("[bold]3.[/] Crear alias")
+        console.print("[bold]4.[/] Eliminar alias")
+        console.print("[bold]5.[/] Enviar carta")
+        console.print("[bold]6.[/] Enviar paquete")
+        console.print("[bold]7.[/] Eliminar carta")
+        console.print("[bold]0.[/] Volver")
+
+        opcion = Prompt.ask("Opción", choices=[str(i) for i in range(8)], default="0")
+
         if opcion == "1":
             info = api.get_info()
             if info:
-                print("\n📊 INFORMACIÓN:")
-                print(json.dumps(info, indent=2, ensure_ascii=False))
-        
+                console.print_json(json.dumps(info, ensure_ascii=False))
+
         elif opcion == "2":
             gente = api.get_gente()
-            print("\n👥 Jugadores:")
+            console.print("\n[bold]👥 Jugadores:[/]")
             for p in gente:
-                print(f"  - {p}")
-        
+                console.print(f"  - {p}")
+
         elif opcion == "3":
-            nombre = input("Nombre del alias: ").strip()
+            nombre = Prompt.ask("Nombre del alias")
             if nombre:
                 api.crear_alias(nombre)
-                print(f"✓ Alias '{nombre}' creado")
-        
+
         elif opcion == "4":
-            nombre = input("Alias a eliminar: ").strip()
+            nombre = Prompt.ask("Alias a eliminar")
             if nombre:
                 api.eliminar_alias(nombre)
-                print(f"✓ Alias '{nombre}' eliminado")
-        
+
         elif opcion == "5":
-            remi = input("Remitente (tu alias): ").strip()
-            dest = input("Destinatario: ").strip()
-            asunto = input("Asunto: ").strip()
-            cuerpo = input("Cuerpo: ").strip()
+            remi = Prompt.ask("Remitente (tu alias)")
+            dest = Prompt.ask("Destinatario")
+            asunto = Prompt.ask("Asunto")
+            cuerpo = Prompt.ask("Cuerpo")
             if all([remi, dest, asunto, cuerpo]):
-                if api.enviar_carta(remi, dest, asunto, cuerpo):
-                    print("✓ Carta enviada")
-                else:
-                    print("✗ Error al enviar")
-        
+                ok = api.enviar_carta(remi, dest, asunto, cuerpo)
+                console.print("[green]✓ Carta enviada[/]" if ok else "[red]✗ Error al enviar[/]")
+
         elif opcion == "6":
-            dest = input("Destinatario: ").strip()
+            dest = Prompt.ask("Destinatario")
             recursos = {}
-            print("Recursos (Enter vacío para terminar):")
+            console.print("[dim]Recursos (Enter vacío para terminar):[/]")
             while True:
-                r = input("  Recurso: ").strip()
+                r = Prompt.ask("  Recurso", default="")
                 if not r:
                     break
-                c = input(f"  Cantidad de {r}: ").strip()
-                if c.isdigit():
-                    recursos[r] = int(c)
+                c = IntPrompt.ask(f"  Cantidad de {r}", default=1)
+                recursos[r] = c
             if recursos:
-                if api.enviar_paquete(dest, recursos):
-                    print(f"✓ Paquete enviado: {recursos}")
-                else:
-                    print("✗ Error al enviar")
-        
+                ok = api.enviar_paquete(dest, recursos)
+                console.print(
+                    f"[green]✓ Paquete enviado: {recursos}[/]" if ok
+                    else "[red]✗ Error al enviar[/]")
+
         elif opcion == "7":
-            uid = input("UID de la carta: ").strip()
+            uid = Prompt.ask("UID de la carta")
             if uid:
                 api.eliminar_carta(uid)
-                print(f"✓ Carta {uid} eliminada")
-        
+                console.print(f"[green]✓ Carta {uid} eliminada[/]")
+
         elif opcion == "0":
-            break
-
-
-def parse_args():
-    """Parsea argumentos de línea de comandos."""
-    parser = argparse.ArgumentParser(
-        description="Agente Negociador Autónomo para fdi-pln-butler",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Ejemplos:
-  Modo interactivo (menú):
-    python main.py
-
-  Lanzar bot directamente:
-    python main.py --alias Bot_1
-    python main.py --alias Bot_1 --modelo llama3.2:3b --debug --max-rondas 15 --pausa 20
-        """
-    )
-    parser.add_argument(
-        "--alias", type=str, default=None,
-        help="Nombre/alias del bot. Si se proporciona, se ejecuta en modo automático (sin menú interactivo)."
-    )
-    parser.add_argument(
-        "--modelo", type=str, default=MODELO_DEFAULT,
-        help=f"Modelo de IA a usar (default: {MODELO_DEFAULT})"
-    )
-    parser.add_argument(
-        "--debug", action="store_true", default=False,
-        help="Activar modo debug (muestra cada decisión del agente)"
-    )
-    parser.add_argument(
-        "--max-rondas", type=int, default=10,
-        help="Número máximo de rondas de negociación (default: 10)"
-    )
-    parser.add_argument(
-        "--pausa", type=int, default=30,
-        help="Segundos de espera entre rondas (default: 30)"
-    )
-    parser.add_argument(
-        "--source-ip", type=str, default=None,
-        help="IP local de origen para el butler (default: None = sin bind)"
-    )
-    parser.add_argument(
-        "--api-url", type=str, default=None,
-        help="URL base de la API del juego (default: config.API_BASE_URL)"
-    )
-    return parser.parse_args()
-
-
-def main():
-    """Punto de entrada principal."""
-    args = parse_args()
-
-    # ─── Modo automático (CLI) ───────────────────────────────────────────
-    if args.alias:
-        print(f"🤖 Iniciando bot '{args.alias}' en modo automático...")
-        _ejecutar_agente(
-            alias=args.alias,
-            modelo=args.modelo,
-            debug=args.debug,
-            max_rondas=args.max_rondas,
-            pausa=args.pausa,
-            interactivo=False,
-            source_ip=args.source_ip,
-            api_url=args.api_url,
-        )
-        return
-
-    # ─── Modo interactivo (menú) ─────────────────────────────────────────
-    print("="*60)
-    print("🎮 SISTEMA DE NEGOCIACIÓN AUTÓNOMO")
-    print("="*60)
-    print("\nEl agente negociará automáticamente para:")
-    print("  1️⃣  Conseguir los recursos objetivo")
-    print("  2️⃣  Maximizar el oro vendiendo excedentes")
-    print("\nActivando DEBUG verás todo lo que hace el agente:")
-    print("  📤 Cartas enviadas")
-    print("  📥 Cartas recibidas")
-    print("  🔍 Análisis de ofertas")
-    print("  🧠 Decisiones tomadas")
-    print("  🔄 Intercambios ejecutados")
-    print("="*60)
-    
-    while True:
-        print("\n1. 🤖 INICIAR AGENTE AUTÓNOMO")
-        print("2. 📡 Operaciones API (manual)")
-        print("0. Salir")
-        
-        opcion = input("\nOpción: ").strip()
-        
-        if opcion == "1":
-            alias = input("\nTu alias para negociar: ").strip()
-            if alias:
-                menu_agente(alias)
-        elif opcion == "2":
-            menu_api()
-        elif opcion == "0":
-            print("\n¡Hasta luego!")
             break
 
 
