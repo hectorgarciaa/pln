@@ -1,94 +1,355 @@
-Tu alias para negociar: AmarNoEsDelito
-────────────────────────────────────────── 🤖 Configuración del Agente ───────────────────────────────────────────
-              Modelos disponibles               
-┏━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ # ┃ Modelo      ┃ Descripción                ┃
-┡━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ 1 │ llama3.2:3b │ ⚡⚡⚡ ULTRA RÁPIDO (3-5s) │
-│ 2 │ qwen3-vl:8b │ ⚡⚡ Balance (5-10s)       │
-│ 3 │ qwen2.5:7b  │ ⚡ Calidad (10-15s)        │
-│ 4 │ phi3:mini   │ ⚡⚡⚡ Muy rápido (3-5s)   │
-│ 5 │ qwen3:8b    │ solo Texto ← default       │
-└───┴─────────────┴────────────────────────────┘
-Selecciona modelo [1/2/3/4/5] (1): 5
-¿Activar modo DEBUG? [y/n] (y): y
-Máximo de rondas (10): 20
-Segundos entre rondas (30): 30
-    📋 Resumen de Configuración    
-┌──────────────┬──────────────────┐
-│  Alias       │  AmarNoEsDelito  │
-│  Modelo      │  qwen3:8b        │
-│  Debug       │  ✅ ACTIVADO     │
-│  Max rondas  │  20              │
-│  Pausa       │  30s             │
-└──────────────┴──────────────────┘
-
-¿Iniciar agente? [y/n] (y): y
+2026-02-10 16:33:56.546 | INFO     | negociador:__init__:228 - Logs guardados en /home/hlocal/Documents/pln/pln/app/logs/AmarNoEsDelito.log
+2026-02-10 16:33:56.550 | ERROR    | api_client:crear_alias:83 - Error de conexión (crear alias): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /alias/AmarNoEsDelito (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:33:56.553 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:33:56.554 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:33:56.554 | ERROR    | negociador:_ejecutar_ronda:1081 - ❌ [ERROR] No se pudo conectar a la API
+2026-02-10 16:34:26.558 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:34:26.559 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:34:26.560 | ERROR    | negociador:_ejecutar_ronda:1081 - ❌ [ERROR] No se pudo conectar a la API
+2026-02-10 16:34:41.072 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:34:41.074 | ERROR    | api_client:get_gente:66 - Error de conexión (gente): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /gente (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:34:54.175 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:34:59.471 | ERROR    | api_client:get_info:54 - Error de conexión (info): HTTPConnectionPool(host='127.0.0.1', port=7719): Max retries exceeded with url: /info (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=7719): Failed to establish a new connection: [Errno 111] Connection refused"))
+2026-02-10 16:44:14.175 | INFO     | negociador:__init__:228 - Logs guardados en /home/hlocal/Documents/pln/pln/app/logs/AmarNoEsDelito.log
 2026-02-10 16:47:23.164 | INFO     | negociador:__init__:228 - Logs guardados en /home/hlocal/Documents/pln/pln/app/logs/AmarNoEsDelito.log
-╭───────────────────────────────╮
-│ 🤖 AGENTE NEGOCIADOR AUTÓNOMO │
-│                               │
-│   Alias:      AmarNoEsDelito  │
-│   Modelo:     qwen3:8b        │
-│   Debug:      ACTIVADO        │
-│   Max rondas: 20              │
-╰───────────────────────────────╯
 2026-02-10 16:47:23.170 | WARNING  | api_client:crear_alias:80 - Error creando alias: status 403
-⚠ No se pudo crear el alias 'AmarNoEsDelito', puede que ya exista.
-
-🔄 RONDA 1/20
-────────────────────────────────────── 📍 RONDA — Modo: conseguir_objetivo ───────────────────────────────────────
 2026-02-10 16:47:23.178 | DEBUG    | negociador:_ejecutar_ronda:1089 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
-  ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': 
-{'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
 2026-02-10 16:47:23.179 | DEBUG    | negociador:_ejecutar_ronda:1105 - ℹ️ [INFO] Procesando buzón…
-  ℹ️ [INFO] Procesando buzón…
 2026-02-10 16:47:23.179 | DEBUG    | negociador:_procesar_buzon:874 - 📥 [RECEPCION] Carta de a | {'asunto': 'Oferta de trueque', 'mensaje': 'Hola, tengo estos recursos de sobra:\n- ladrillos: 1\n- piedra: 4\n- tela: 4\n- oro: 8\n- arroz: 1\n'}
-  📥 [RECEPCION] Carta de a | {'asunto': 'Oferta de trueque', 'mensaje': 'Hola, tengo estos recursos de sobra:\n- 
-ladrillos: 1\n- piedra: 4\n- tela: 4\n- oro: 8\n- arroz: 1\n'}
 2026-02-10 16:47:29.327 | DEBUG    | negociador:_analizar_mensaje:366 - • [DEBUG] IA unificada: {'es_aceptacion': False, 'es_estafa': False, 'ofrecen': {}, 'piden': {}, 'razon': 'Mensaje de anuncio de recursos sin propuesta de intercambio'}
-  • [DEBUG] IA unificada: {'es_aceptacion': False, 'es_estafa': False, 'ofrecen': {}, 'piden': {}, 'razon': 
-'Mensaje de anuncio de recursos sin propuesta de intercambio'}
 2026-02-10 16:47:29.328 | DEBUG    | negociador:_procesar_buzon:931 - 🔍 [ANALISIS] Carta de a analizada | {'ofrecen': {}, 'piden': {}, 'aceptar': False, 'razon': 'oferta incompleta (falta ofrecen o piden)'}
-  🔍 [ANALISIS] Carta de a analizada | {'ofrecen': {}, 'piden': {}, 'aceptar': False, 'razon': 'oferta incompleta 
-(falta ofrecen o piden)'}
 2026-02-10 16:47:29.329 | DEBUG    | negociador:_procesar_buzon:1016 - ℹ️ [INFO] Mensaje de a sin propuesta clara: oferta incompleta (falta ofrecen o piden)
-  ℹ️ [INFO] Mensaje de a sin propuesta clara: oferta incompleta (falta ofrecen o piden)
 2026-02-10 16:47:29.334 | DEBUG    | negociador:_ejecutar_ronda:1116 - ℹ️ [INFO] Enviando propuestas…
-  ℹ️ [INFO] Enviando propuestas…
-Traceback (most recent call last):
-  File "/home/hlocal/Documents/pln/pln/app/main.py", line 266, in <module>
-    main()
-  File "/home/hlocal/Documents/pln/pln/.venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
-    return self.main(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hlocal/Documents/pln/pln/.venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
-    rv = self.invoke(ctx)
-         ^^^^^^^^^^^^^^^^
-  File "/home/hlocal/Documents/pln/pln/.venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
-    return ctx.invoke(self.callback, **ctx.params)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hlocal/Documents/pln/pln/.venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
-    return callback(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hlocal/Documents/pln/pln/app/main.py", line 84, in main
-    _menu_agente(alias)
-  File "/home/hlocal/Documents/pln/pln/app/main.py", line 136, in _menu_agente
-    _ejecutar_agente(alias, modelo, debug, max_rondas, pausa, interactivo=True)
-  File "/home/hlocal/Documents/pln/pln/app/main.py", line 151, in _ejecutar_agente
-    agente.ejecutar(max_rondas)
-  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 1155, in ejecutar
-    completado = self._ejecutar_ronda()
-                 ^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 1117, in _ejecutar_ronda
-    self._enviar_propuestas(necesidades, excedentes, estado["oro"])
-  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 1035, in _enviar_propuestas
-    propuesta = self._generar_propuesta(jugador, necesidades, excedentes, oro)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 439, in _generar_propuesta
-    if self._rechazo_vigente(clave):
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hlocal/Documents/pln/pln/app/negociador.py", line 408, in _rechazo_vigente
-    if clave not in self.rechazos_recibidos:
-       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-TypeError: unhashable type: 'dict'
+2026-02-10 16:52:13.522 | INFO     | negociador:__init__:228 - Logs guardados en /home/hlocal/Documents/pln/pln/app/logs/AmarNoEsDelito.log
+2026-02-10 16:52:13.528 | WARNING  | api_client:crear_alias:93 - Error creando alias: status 403
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:52:13.540 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:52:13.541 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:52:13.541 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:52:13.541 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:52:13.541 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:52:13.542 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:52:13.542 | DEBUG    | negociador:_procesar_buzon:877 - 📥 [RECEPCION] Carta de burrito sabanero | {'asunto': 'Propuesta', 'mensaje': 'Necesito:\n{\n  "tela": 2,\n  "madera": 5,\n  "ladrillos": 3\n}\n\nOfrezco:\n{\n  "piedra": 4,\n  "queso": 3\n}\n\nSi te interesa intercambiar, por favor propón un'}
+2026-02-10 16:52:19.204 | DEBUG    | negociador:_analizar_mensaje:369 - • [DEBUG] IA unificada: {'es_aceptacion': False, 'es_estafa': False, 'ofrecen': {'piedra': 4, 'queso': 3}, 'piden': {'ladrillos': 3, 'madera': 5, 'tela': 2}, 'razon': 'El mensaje es una propuesta de intercambio estándar sin señales de estafa o aceptación previa.'}
+2026-02-10 16:52:19.205 | DEBUG    | negociador:_procesar_buzon:934 - 🔍 [ANALISIS] Carta de burrito sabanero analizada | {'ofrecen': {'piedra': 4, 'queso': 3}, 'piden': {'ladrillos': 3, 'madera': 5, 'tela': 2}, 'aceptar': False, 'razon': 'no ofrecen nada de lo que necesito'}
+2026-02-10 16:52:19.206 | DEBUG    | negociador:_procesar_buzon:1010 - 🧠 [DECISION] RECHAZO oferta de burrito sabanero (no ofrecen nada de lo que necesito)
+2026-02-10 16:52:19.210 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a burrito sabanero | {'asunto': 'Re: Propuesta', 'cuerpo': 'Gracias por la oferta, burrito sabanero, pero por ahora no me conviene ese intercambio. Saludos, Ama…', 'exito': True}
+2026-02-10 16:52:19.214 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:52:19.217 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a garibaldi | {'asunto': 'Propuesta: mi 1 arroz por tu 2 ladrillos', 'cuerpo': 'Hola garibaldi, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 1 arroz y tú me das 2 ladr…', 'exito': True}
+2026-02-10 16:52:19.218 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con garibaldi: dar={'arroz': 1}, pedir={'ladrillos': 2}
+2026-02-10 16:52:20.224 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a trilobite | {'asunto': 'Propuesta: mi 3 tela por tu 2 trigo', 'cuerpo': 'Hola trilobite, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 3 tela y tú me das 2 trigo…', 'exito': True}
+2026-02-10 16:52:20.227 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con trilobite: dar={'tela': 3}, pedir={'trigo': 2}
+2026-02-10 16:52:21.236 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a burrito sabanero | {'asunto': 'Propuesta: mi 2 tela por tu 2 madera', 'cuerpo': 'Hola burrito sabanero, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 2 tela y tú me das …', 'exito': True}
+2026-02-10 16:52:21.238 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con burrito sabanero: dar={'tela': 2}, pedir={'madera': 2}
+2026-02-10 16:52:22.245 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a LOS ELEGIDOS | {'asunto': 'Propuesta: mi 4 oro por tu 2 ladrillos', 'cuerpo': 'Hola LOS ELEGIDOS, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 4 oro y tú me das 2 lad…', 'exito': True}
+2026-02-10 16:52:22.247 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con LOS ELEGIDOS: dar={'oro': 4}, pedir={'ladrillos': 2}
+2026-02-10 16:52:23.253 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a tung tung tung sahur | {'asunto': 'Propuesta: mi 4 oro por tu 2 ladrillos', 'cuerpo': 'Hola tung tung tung sahur, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 4 oro y tú me d…', 'exito': True}
+2026-02-10 16:52:23.254 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con tung tung tung sahur: dar={'oro': 4}, pedir={'ladrillos': 2}
+2026-02-10 16:52:24.261 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a ardilla feroz | {'asunto': 'Propuesta: mi 4 oro por tu 2 ladrillos', 'cuerpo': 'Hola ardilla feroz, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 4 oro y tú me das 2 la…', 'exito': True}
+2026-02-10 16:52:24.262 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con ardilla feroz: dar={'oro': 4}, pedir={'ladrillos': 2}
+2026-02-10 16:52:25.264 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:52:25.265 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:52:25.267 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:52:25.268 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:52:25.269 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:52:25.270 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:52:25.270 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (11.7s) — esperando 3s para recibir respuestas
+2026-02-10 16:52:58.545 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:52:58.545 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:52:58.546 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:52:58.546 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:52:58.546 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:52:58.546 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:52:58.547 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:52:58.547 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:52:58.547 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:52:58.547 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:52:58.548 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:52:58.548 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:52:58.548 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:52:58.548 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:52:58.550 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:52:58.552 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:52:58.553 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para garibaldi
+2026-02-10 16:52:58.554 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para trilobite
+2026-02-10 16:52:58.555 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para burrito sabanero
+2026-02-10 16:52:58.556 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para LOS ELEGIDOS
+2026-02-10 16:52:58.557 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para tung tung tung sahur
+2026-02-10 16:52:58.558 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para ardilla feroz
+2026-02-10 16:52:58.559 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:52:58.560 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:52:58.561 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:52:58.561 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:52:58.562 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:52:58.562 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:52:58.563 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (0.0s) — esperando 15s para recibir respuestas
+2026-02-10 16:53:43.549 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:53:43.549 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:53:43.549 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:53:43.550 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:53:43.550 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:53:43.550 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:53:43.550 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:53:43.550 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:53:43.550 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:53:43.550 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:53:43.551 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:53:43.551 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:53:43.551 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:53:43.552 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:53:43.554 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:53:43.554 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:53:43.555 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para garibaldi
+2026-02-10 16:53:43.556 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para trilobite
+2026-02-10 16:53:43.557 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para burrito sabanero
+2026-02-10 16:53:43.557 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para LOS ELEGIDOS
+2026-02-10 16:53:43.558 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para tung tung tung sahur
+2026-02-10 16:53:43.559 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para ardilla feroz
+2026-02-10 16:53:43.560 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:53:43.560 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:53:43.561 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:53:43.562 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:53:43.563 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:53:43.563 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:53:43.564 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (0.0s) — esperando 15s para recibir respuestas
+2026-02-10 16:54:28.551 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:54:28.551 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:54:28.551 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:54:28.551 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:54:28.551 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:54:28.552 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:54:28.552 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:54:28.552 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:54:28.552 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:54:28.552 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:54:28.553 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:54:28.553 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:54:28.553 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:54:28.553 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache gallardo', 'ip': '147.96.84.141'} -> mapache gallardo
+2026-02-10 16:54:28.553 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:54:28.555 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:54:28.556 | DEBUG    | negociador:_procesar_buzon:877 - 📥 [RECEPCION] Carta de burrito sabanero | {'asunto': 'Propuesta', 'mensaje': 'Necesito:\n{\n  "tela": 2,\n  "madera": 5,\n  "ladrillos": 3\n}\n\nOfrezco:\n{\n  "piedra": 4,\n  "queso": 3\n}\n\nSi te interesa intercambiar, por favor propón un'}
+2026-02-10 16:54:34.381 | DEBUG    | negociador:_analizar_mensaje:369 - • [DEBUG] IA unificada: {'es_aceptacion': False, 'es_estafa': False, 'ofrecen': {'piedra': 4, 'queso': 3}, 'piden': {'ladrillos': 3, 'madera': 5, 'tela': 2}, 'razon': 'El mensaje es una propuesta de intercambio estándar, no acepta un trato previo ni muestra señales de estafa.'}
+2026-02-10 16:54:34.382 | DEBUG    | negociador:_procesar_buzon:934 - 🔍 [ANALISIS] Carta de burrito sabanero analizada | {'ofrecen': {'piedra': 4, 'queso': 3}, 'piden': {'ladrillos': 3, 'madera': 5, 'tela': 2}, 'aceptar': False, 'razon': 'no ofrecen nada de lo que necesito'}
+2026-02-10 16:54:34.383 | DEBUG    | negociador:_procesar_buzon:1010 - 🧠 [DECISION] RECHAZO oferta de burrito sabanero (no ofrecen nada de lo que necesito)
+2026-02-10 16:54:34.387 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a burrito sabanero | {'asunto': 'Re: Propuesta', 'cuerpo': 'Gracias por la oferta, burrito sabanero, pero por ahora no me conviene ese intercambio. Saludos, Ama…', 'exito': True}
+2026-02-10 16:54:34.391 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:54:34.392 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para garibaldi
+2026-02-10 16:54:34.392 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para trilobite
+2026-02-10 16:54:34.392 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para burrito sabanero
+2026-02-10 16:54:34.393 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para LOS ELEGIDOS
+2026-02-10 16:54:34.393 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para tung tung tung sahur
+2026-02-10 16:54:34.393 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para ardilla feroz
+2026-02-10 16:54:34.393 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:54:34.394 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:54:34.394 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:54:34.394 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:54:34.394 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:54:34.395 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:54:34.395 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache gallardo
+2026-02-10 16:54:34.395 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (5.9s) — esperando 9s para recibir respuestas
+2026-02-10 16:55:13.557 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:55:13.558 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:55:13.558 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:55:13.558 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:55:13.559 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:55:13.560 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:55:13.561 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:55:13.561 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:55:13.561 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:55:13.561 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:55:13.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:55:13.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:55:13.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:55:13.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache gallardo', 'ip': '147.96.84.141'} -> mapache gallardo
+2026-02-10 16:55:13.563 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:55:13.565 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:55:13.566 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:55:13.567 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para garibaldi
+2026-02-10 16:55:13.568 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para trilobite
+2026-02-10 16:55:13.569 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para burrito sabanero
+2026-02-10 16:55:13.570 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para LOS ELEGIDOS
+2026-02-10 16:55:13.571 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para tung tung tung sahur
+2026-02-10 16:55:13.572 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para ardilla feroz
+2026-02-10 16:55:13.573 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:55:13.574 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:55:13.575 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:55:13.575 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:55:13.576 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:55:13.576 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:55:13.577 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache gallardo
+2026-02-10 16:55:13.577 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (0.0s) — esperando 15s para recibir respuestas
+2026-02-10 16:55:58.560 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:55:58.560 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:55:58.561 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:55:58.561 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:55:58.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:55:58.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:55:58.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:55:58.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:55:58.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:55:58.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:55:58.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:55:58.562 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:55:58.563 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:55:58.563 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache gallardo', 'ip': '147.96.84.141'} -> mapache gallardo
+2026-02-10 16:55:58.563 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:55:58.565 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:55:58.566 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:55:58.566 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para garibaldi
+2026-02-10 16:55:58.567 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para trilobite
+2026-02-10 16:55:58.568 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para burrito sabanero
+2026-02-10 16:55:58.569 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para LOS ELEGIDOS
+2026-02-10 16:55:58.570 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para tung tung tung sahur
+2026-02-10 16:55:58.571 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para ardilla feroz
+2026-02-10 16:55:58.571 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:55:58.572 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:55:58.573 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:55:58.573 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:55:58.574 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:55:58.575 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:55:58.575 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache gallardo
+2026-02-10 16:55:58.576 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (0.0s) — esperando 15s para recibir respuestas
+2026-02-10 16:56:43.564 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:56:43.565 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:56:43.565 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:56:43.565 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:56:43.565 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:56:43.565 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:56:43.565 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:56:43.565 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:56:43.565 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:56:43.566 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:56:43.566 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:56:43.566 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:56:43.566 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:56:43.566 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache gallardo', 'ip': '147.96.84.141'} -> mapache gallardo
+2026-02-10 16:56:43.566 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:56:43.568 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:56:43.569 | DEBUG    | negociador:_procesar_buzon:877 - 📥 [RECEPCION] Carta de tung tung tung sahur | {'asunto': 'Re: Propuesta: mi 4 oro por tu 2 ladrillos', 'mensaje': 'Hola AmarNoEsDelito, gracias por la propuesta. Sin embargo, actualmente necesito arroz y trigo para alcanzar mi objetivo, y esta oferta no se alinea c'}
+2026-02-10 16:56:48.512 | DEBUG    | negociador:_analizar_mensaje:369 - • [DEBUG] IA unificada: {'es_aceptacion': False, 'es_estafa': False, 'ofrecen': {}, 'piden': {'arroz': 1, 'trigo': 1}, 'razon': 'El remitente rechaza la propuesta anterior al indicar que sus necesidades actuales no coinciden con la oferta, pidiendo específicamente arroz y trigo.'}
+2026-02-10 16:56:48.513 | DEBUG    | negociador:_procesar_buzon:934 - 🔍 [ANALISIS] Carta de tung tung tung sahur analizada | {'ofrecen': {}, 'piden': {'arroz': 1, 'trigo': 1}, 'aceptar': False, 'razon': 'oferta incompleta (falta ofrecen o piden)'}
+2026-02-10 16:56:48.514 | DEBUG    | negociador:_procesar_buzon:1010 - 🧠 [DECISION] RECHAZO oferta de tung tung tung sahur (oferta incompleta (falta ofrecen o piden))
+2026-02-10 16:56:48.518 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a tung tung tung sahur | {'asunto': 'Re: Re: Propuesta: mi 4 oro por tu 2 ladrillos', 'cuerpo': 'Gracias por la oferta, tung tung tung sahur, pero por ahora no me conviene ese intercambio. Saludos,…', 'exito': True}
+2026-02-10 16:56:48.523 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:56:48.523 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para garibaldi
+2026-02-10 16:56:48.524 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para trilobite
+2026-02-10 16:56:48.524 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para burrito sabanero
+2026-02-10 16:56:48.524 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para LOS ELEGIDOS
+2026-02-10 16:56:48.525 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para tung tung tung sahur
+2026-02-10 16:56:48.525 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para ardilla feroz
+2026-02-10 16:56:48.525 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:56:48.525 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:56:48.526 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:56:48.526 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:56:48.526 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:56:48.527 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:56:48.527 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache gallardo
+2026-02-10 16:56:48.527 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (5.0s) — esperando 10s para recibir respuestas
+2026-02-10 16:57:28.566 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:57:28.567 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:57:28.567 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:57:28.567 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:57:28.568 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:57:28.568 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:57:28.568 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:57:28.568 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:57:28.568 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:57:28.568 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:57:28.569 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:57:28.569 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:57:28.569 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:57:28.569 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache gallardo', 'ip': '147.96.84.141'} -> mapache gallardo
+2026-02-10 16:57:28.569 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:57:28.571 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:57:28.572 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:57:28.576 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a garibaldi | {'asunto': 'Propuesta: mi 3 tela por tu 2 ladrillos', 'cuerpo': 'Hola garibaldi, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 3 tela y tú me das 2 ladri…', 'exito': True}
+2026-02-10 16:57:28.578 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con garibaldi: dar={'tela': 3}, pedir={'ladrillos': 2}
+2026-02-10 16:57:29.584 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a trilobite | {'asunto': 'Propuesta: mi 2 tela por tu 2 trigo', 'cuerpo': 'Hola trilobite, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 2 tela y tú me das 2 trigo…', 'exito': True}
+2026-02-10 16:57:29.586 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con trilobite: dar={'tela': 2}, pedir={'trigo': 2}
+2026-02-10 16:57:30.596 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a burrito sabanero | {'asunto': 'Propuesta: mi 1 arroz por tu 2 madera', 'cuerpo': 'Hola burrito sabanero, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 1 arroz y tú me das…', 'exito': True}
+2026-02-10 16:57:30.599 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con burrito sabanero: dar={'arroz': 1}, pedir={'madera': 2}
+2026-02-10 16:57:31.636 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a LOS ELEGIDOS | {'asunto': 'Propuesta: mi 4 oro por tu 2 ladrillos', 'cuerpo': 'Hola LOS ELEGIDOS, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 4 oro y tú me das 2 lad…', 'exito': True}
+2026-02-10 16:57:31.638 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con LOS ELEGIDOS: dar={'oro': 4}, pedir={'ladrillos': 2}
+2026-02-10 16:57:32.645 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a tung tung tung sahur | {'asunto': 'Propuesta: mi 4 oro por tu 2 ladrillos', 'cuerpo': 'Hola tung tung tung sahur, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 4 oro y tú me d…', 'exito': True}
+2026-02-10 16:57:32.647 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con tung tung tung sahur: dar={'oro': 4}, pedir={'ladrillos': 2}
+2026-02-10 16:57:33.655 | DEBUG    | negociador:_enviar_carta:631 - 📤 [ENVIO] Carta a ardilla feroz | {'asunto': 'Propuesta: mi 4 oro por tu 2 ladrillos', 'cuerpo': 'Hola ardilla feroz, soy AmarNoEsDelito. Te propongo un intercambio: yo te doy 4 oro y tú me das 2 la…', 'exito': True}
+2026-02-10 16:57:33.657 | DEBUG    | negociador:_enviar_propuestas:1059 - ℹ️ [INFO] Acuerdo pendiente con ardilla feroz: dar={'oro': 4}, pedir={'ladrillos': 2}
+2026-02-10 16:57:34.659 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:57:34.661 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:57:34.663 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:57:34.664 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:57:34.665 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:57:34.666 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:57:34.667 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache gallardo
+2026-02-10 16:57:34.667 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (6.1s) — esperando 9s para recibir respuestas
+2026-02-10 16:58:13.574 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:58:13.574 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:58:13.574 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:58:13.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:58:13.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:58:13.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:58:13.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:58:13.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:58:13.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:58:13.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:58:13.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:58:13.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:58:13.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:58:13.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache gallardo', 'ip': '147.96.84.141'} -> mapache gallardo
+2026-02-10 16:58:13.577 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:58:13.578 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:58:13.579 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:58:13.580 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para garibaldi
+2026-02-10 16:58:13.581 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para trilobite
+2026-02-10 16:58:13.582 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para burrito sabanero
+2026-02-10 16:58:13.582 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para LOS ELEGIDOS
+2026-02-10 16:58:13.583 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para tung tung tung sahur
+2026-02-10 16:58:13.584 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para ardilla feroz
+2026-02-10 16:58:13.585 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:58:13.586 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:58:13.587 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:58:13.588 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:58:13.588 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:58:13.589 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:58:13.590 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache gallardo
+2026-02-10 16:58:13.590 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (0.0s) — esperando 15s para recibir respuestas
+2026-02-10 16:58:58.574 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'garibaldi', 'ip': '147.96.84.153'} -> garibaldi
+2026-02-10 16:58:58.574 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'trilobite', 'ip': '147.96.84.145'} -> trilobite
+2026-02-10 16:58:58.574 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'burrito sabanero', 'ip': '147.96.84.144'} -> burrito sabanero
+2026-02-10 16:58:58.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'LOS ELEGIDOS', 'ip': '147.96.84.140'} -> LOS ELEGIDOS
+2026-02-10 16:58:58.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'tung tung tung sahur', 'ip': '147.96.84.150'} -> tung tung tung sahur
+2026-02-10 16:58:58.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'ardilla feroz', 'ip': '147.96.84.138'} -> ardilla feroz
+2026-02-10 16:58:58.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'lobo leal', 'ip': '147.96.84.142'} -> lobo leal
+2026-02-10 16:58:58.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache leal', 'ip': '147.96.84.143'} -> mapache leal
+2026-02-10 16:58:58.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Mercader_Supremo_01', 'ip': '147.96.84.148'} -> Mercader_Supremo_01
+2026-02-10 16:58:58.575 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'PUMBA', 'ip': '147.96.84.152'} -> PUMBA
+2026-02-10 16:58:58.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'AmarNoEsDelito', 'ip': '147.96.84.151'} -> AmarNoEsDelito
+2026-02-10 16:58:58.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'profe', 'ip': '147.96.81.252'} -> profe
+2026-02-10 16:58:58.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'Nortenios', 'ip': '147.96.84.146'} -> Nortenios
+2026-02-10 16:58:58.576 | DEBUG    | api_client:get_gente:71 - get_gente: item dict normalizado {'alias': 'mapache gallardo', 'ip': '147.96.84.141'} -> mapache gallardo
+2026-02-10 16:58:58.576 | DEBUG    | negociador:_ejecutar_ronda:1092 - ℹ️ [INFO] Estado actual | {'oro': 14, 'necesidades': {'ladrillos': 5, 'trigo': 4, 'madera': 5}, 'excedentes': {'arroz': 1, 'tela': 5}, 'objetivo_completado': False}
+2026-02-10 16:58:58.578 | DEBUG    | negociador:_ejecutar_ronda:1108 - ℹ️ [INFO] Procesando buzón…
+2026-02-10 16:58:58.579 | DEBUG    | negociador:_ejecutar_ronda:1119 - ℹ️ [INFO] Enviando propuestas…
+2026-02-10 16:58:58.579 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para garibaldi
+2026-02-10 16:58:58.580 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para trilobite
+2026-02-10 16:58:58.581 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para burrito sabanero
+2026-02-10 16:58:58.581 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para LOS ELEGIDOS
+2026-02-10 16:58:58.582 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para tung tung tung sahur
+2026-02-10 16:58:58.583 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para ardilla feroz
+2026-02-10 16:58:58.584 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para lobo leal
+2026-02-10 16:58:58.584 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache leal
+2026-02-10 16:58:58.585 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Mercader_Supremo_01
+2026-02-10 16:58:58.586 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para PUMBA
+2026-02-10 16:58:58.587 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para profe
+2026-02-10 16:58:58.587 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para Nortenios
+2026-02-10 16:58:58.588 | DEBUG    | negociador:_enviar_propuestas:1040 - ℹ️ [INFO] No se generó propuesta para mapache gallardo
+2026-02-10 16:58:58.589 | DEBUG    | negociador:_ejecutar_ronda:1131 - ℹ️ [INFO] Ronda rápida (0.0s) — esperando 15s para recibir respuestas
