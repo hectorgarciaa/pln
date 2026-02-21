@@ -17,6 +17,7 @@ import os
 import re as _re
 import sys
 import time
+import uuid
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
@@ -179,6 +180,13 @@ class AgenteNegociador:
         self.lista_negra: List[str] = []
         self.contactados_esta_ronda: List[str] = []
         self.acuerdos_pendientes: Dict[str, List[Dict]] = {}
+        # Acuerdos que salieron de pendientes por TTL, retenidos por tx
+        # para aceptar respuestas tardías sin perder trazabilidad.
+        self.acuerdos_expirados_tx: Dict[str, Dict[str, Any]] = {}
+        # Índice por remitente para aceptar respuestas tardías sin tx.
+        self.acuerdos_expirados_por_remitente: Dict[str, List[Dict[str, Any]]] = {}
+        # tx ya ejecutados para evitar dobles envíos por aceptaciones repetidas.
+        self.tx_cerrados: Dict[str, float] = {}
         self.intercambios_realizados: List[Dict] = []
         self.cartas_vistas: set = set()
 
@@ -193,6 +201,10 @@ class AgenteNegociador:
         # Expiran tras RECHAZO_TTL rondas para reintentar con nuevas condiciones
         self.rechazos_recibidos: Dict[tuple, int] = {}
         self.RECHAZO_TTL: int = 2  # rondas antes de reintentar un combo rechazado
+        # Ventanas de tiempo para gestión robusta de acuerdos.
+        self.ACUERDO_TTL_SEGUNDOS: int = 300
+        self.ACUERDO_GRACIA_TTL_SEGUNDOS: int = 240
+        self.TX_CERRADO_TTL_SEGUNDOS: int = 1200
         
         # Snapshot de recursos para detectar paquetes recibidos
         self.recursos_ronda_anterior: Dict[str, int] = {}
@@ -416,6 +428,65 @@ class AgenteNegociador:
         ronda_rechazo = self.rechazos_recibidos[clave]
         return (self.ronda_actual - ronda_rechazo) < self.RECHAZO_TTL
 
+    def _nuevo_tx_id(self) -> str:
+        """Genera un identificador corto para emparejar propuestas y aceptaciones."""
+        return uuid.uuid4().hex[:10]
+
+    def _registrar_acuerdo_pendiente(self, remitente: str,
+                                     recursos_dar: Dict[str, int],
+                                     recursos_pedir: Dict[str, int],
+                                     tx_id: str):
+        """Guarda un acuerdo pendiente para responder cuando llegue su aceptación."""
+        if remitente not in self.acuerdos_pendientes:
+            self.acuerdos_pendientes[remitente] = []
+        self.acuerdos_pendientes[remitente].append({
+            "tx_id": tx_id,
+            "recursos_dar": recursos_dar,
+            "recursos_pedir": recursos_pedir,
+            "timestamp": time.time(),
+        })
+
+    def _mover_a_expirados_por_tx(self, remitente: str, acuerdo: Dict[str, Any],
+                                  ahora: float):
+        """Mueve un acuerdo pendiente expirado a caché temporal por tx_id."""
+        tx_id = acuerdo.get("tx_id")
+        if tx_id and tx_id in self.tx_cerrados:
+            return
+        exp_data = {
+            "remitente": remitente,
+            "acuerdo": acuerdo,
+            "expira_en": ahora + self.ACUERDO_GRACIA_TTL_SEGUNDOS,
+        }
+        if tx_id:
+            self.acuerdos_expirados_tx[tx_id] = exp_data
+        self.acuerdos_expirados_por_remitente.setdefault(remitente, []).append(exp_data)
+
+    def _limpiar_cache_tx(self, ahora: float):
+        """Limpia tx expirados y tx cerrados antiguos."""
+        exp_tx_vencidos = [
+            tx for tx, data in self.acuerdos_expirados_tx.items()
+            if data.get("expira_en", 0) <= ahora
+        ]
+        for tx in exp_tx_vencidos:
+            del self.acuerdos_expirados_tx[tx]
+
+        for remitente in list(self.acuerdos_expirados_por_remitente.keys()):
+            vivos = [
+                item for item in self.acuerdos_expirados_por_remitente[remitente]
+                if item.get("expira_en", 0) > ahora
+            ]
+            if vivos:
+                self.acuerdos_expirados_por_remitente[remitente] = vivos
+            else:
+                del self.acuerdos_expirados_por_remitente[remitente]
+
+        cerrados_vencidos = [
+            tx for tx, ts in self.tx_cerrados.items()
+            if (ahora - ts) >= self.TX_CERRADO_TTL_SEGUNDOS
+        ]
+        for tx in cerrados_vencidos:
+            del self.tx_cerrados[tx]
+
     def _generar_propuesta(self, destinatario: str, necesidades: Dict,
                            excedentes: Dict, oro: int) -> Optional[Dict[str, str]]:
         """Genera una propuesta evitando combinaciones ya enviadas o rechazadas."""
@@ -529,9 +600,11 @@ class AgenteNegociador:
 
         ofrezco_str = ", ".join(f"{c} {r}" for r, c in ofrezco.items())
         pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
+        tx_id = self._nuevo_tx_id()
 
         cuerpo = (
             f"Hola {destinatario}, soy {self.alias}. "
+            f"[tx:{tx_id}] "
             f"Te propongo un intercambio: "
             f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
             f"Si aceptas, responde 'acepto el trato'. "
@@ -540,10 +613,11 @@ class AgenteNegociador:
         )
 
         return {
-            "asunto": f"Propuesta: mi {ofrezco_str} por tu {pido_str}",
+            "asunto": f"Propuesta: [tx:{tx_id}] mi {ofrezco_str} por tu {pido_str}",
             "cuerpo": cuerpo,
             "_ofrezco": ofrezco,
             "_pido": pido,
+            "_tx_id": tx_id,
         }
 
     def _generar_contraoferta(self, destinatario: str,
@@ -594,9 +668,11 @@ class AgenteNegociador:
 
         ofrezco_str = ", ".join(f"{c} {r}" for r, c in ofrezco.items())
         pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
+        tx_id = self._nuevo_tx_id()
 
         cuerpo = (
             f"Hola {destinatario}, soy {self.alias}. "
+            f"[tx:{tx_id}] "
             f"Vi tu oferta pero no tengo lo que pides. "
             f"Te hago una contrapropuesta: "
             f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
@@ -606,10 +682,11 @@ class AgenteNegociador:
         )
 
         return {
-            "asunto": f"Contrapropuesta: mi {ofrezco_str} por tu {pido_str}",
+            "asunto": f"Contrapropuesta: [tx:{tx_id}] mi {ofrezco_str} por tu {pido_str}",
             "cuerpo": cuerpo,
             "_ofrezco": ofrezco,
             "_pido": pido,
+            "_tx_id": tx_id,
         }
 
     def _generar_texto_propuesta_ia(self, destinatario: str, necesidades: Dict,
@@ -638,8 +715,10 @@ class AgenteNegociador:
 
         texto = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
         if texto and not texto.startswith("Error"):
+            tx_id = propuesta.get("_tx_id")
+            tx_tag = f" [tx:{tx_id}]" if tx_id else ""
             propuesta["cuerpo"] = texto
-            propuesta["asunto"] = f"Intercambio: mi {ofrezco_str} por tu {pido_str}"
+            propuesta["asunto"] = f"Intercambio:{tx_tag} mi {ofrezco_str} por tu {pido_str}"
         return propuesta
 
     # =====================================================================
@@ -710,46 +789,142 @@ class AgenteNegociador:
         # Actualizar snapshot para la próxima ronda
         self.recursos_ronda_anterior = recursos_actuales.copy()
 
-    def _responder_aceptacion(self, remitente: str, mensaje_original: str) -> bool:
+    def _responder_aceptacion(self, remitente: str, mensaje_original: str,
+                              asunto_original: str = "") -> bool:
         """Responde a una aceptación enviando los recursos acordados.
 
-        Intenta buscar el acuerdo pendiente que mejor coincida con lo que
-        el remitente menciona en su mensaje de aceptación.
-        Verifica que los recursos sigan disponibles antes de enviar.
+        Prioriza emparejar por tx_id para evitar cruces entre tratos con
+        el mismo remitente. Si no hay tx_id, solo permite fallback seguro.
+        Verifica disponibilidad y evita romper el objetivo al enviar.
         """
-        if remitente not in self.acuerdos_pendientes or not self.acuerdos_pendientes[remitente]:
-            self._log("INFO", f"Aceptación de {remitente} sin acuerdo pendiente registrado")
+        tx_id_mensaje = self._extraer_tx_id(asunto_original, mensaje_original)
+        if tx_id_mensaje and tx_id_mensaje in self.tx_cerrados:
+            self._log("INFO", f"Aceptación duplicada de {remitente} para tx={tx_id_mensaje} (ya cerrado)")
             return False
 
-        # Intentar encontrar el acuerdo que coincide con el mensaje
-        acuerdo_idx = 0
-        msg_lower = mensaje_original.lower()
-        acuerdos = self.acuerdos_pendientes[remitente]
-        for i, ac in enumerate(acuerdos):
-            # Si el mensaje menciona algún recurso del acuerdo, preferirlo
-            for rec in ac.get("recursos_dar", {}):
-                if rec in msg_lower:
+        acuerdos = self.acuerdos_pendientes.get(remitente, [])
+        acuerdo: Optional[Dict[str, Any]] = None
+        acuerdo_idx: Optional[int] = None
+        origen_acuerdo = "none"
+        ahora = time.time()
+
+        if tx_id_mensaje:
+            for i, ac in enumerate(acuerdos):
+                if ac.get("tx_id") == tx_id_mensaje:
+                    acuerdo = ac
                     acuerdo_idx = i
-                    break
-            for rec in ac.get("recursos_pedir", {}):
-                if rec in msg_lower:
-                    acuerdo_idx = i
+                    origen_acuerdo = "pendiente"
                     break
 
-        acuerdo = acuerdos.pop(acuerdo_idx)
-        if not acuerdos:
-            del self.acuerdos_pendientes[remitente]
+            if acuerdo is None:
+                acuerdo_exp = self.acuerdos_expirados_tx.get(tx_id_mensaje)
+                if acuerdo_exp:
+                    if acuerdo_exp.get("expira_en", 0) >= ahora \
+                            and acuerdo_exp.get("remitente") == remitente:
+                        acuerdo = acuerdo_exp.get("acuerdo")
+                        origen_acuerdo = "expirado"
+                        self._log(
+                            "INFO",
+                            f"Aceptación tardía de {remitente} para tx={tx_id_mensaje} "
+                            f"(recuperado de caché de expirados)",
+                        )
+                    else:
+                        # Si llegó ya vencido o de otro remitente, no es válido.
+                        self.acuerdos_expirados_tx.pop(tx_id_mensaje, None)
+
+            if acuerdo is None:
+                self._log(
+                    "INFO",
+                    f"Aceptación de {remitente} con tx={tx_id_mensaje} "
+                    f"sin acuerdo pendiente/expirado coincidente",
+                )
+                return False
+        else:
+            # Sin tx: intentar casar por asunto y, si no, por heurística determinista.
+            # Extraer "mi ... por tu ..." del asunto (si viene en un Re:).
+            m_asunto = self._RE_ASUNTO_RECURSOS.search(asunto_original or "")
+            asunto_mi: Dict[str, int] = {}
+            asunto_tu: Dict[str, int] = {}
+            if m_asunto:
+                for cant, rec in self._RE_RECURSO_INDIVIDUAL.findall(m_asunto.group(1)):
+                    asunto_mi[rec.lower()] = asunto_mi.get(rec.lower(), 0) + int(cant)
+                for cant, rec in self._RE_RECURSO_INDIVIDUAL.findall(m_asunto.group(2)):
+                    asunto_tu[rec.lower()] = asunto_tu.get(rec.lower(), 0) + int(cant)
+
+            if acuerdos:
+                if asunto_mi or asunto_tu:
+                    for i, ac in enumerate(acuerdos):
+                        dar_norm = {str(k).lower(): int(v) for k, v in ac.get("recursos_dar", {}).items()}
+                        pedir_norm = {str(k).lower(): int(v) for k, v in ac.get("recursos_pedir", {}).items()}
+                        if dar_norm == asunto_mi and pedir_norm == asunto_tu:
+                            acuerdo = ac
+                            acuerdo_idx = i
+                            origen_acuerdo = "pendiente"
+                            break
+                if acuerdo is None and len(acuerdos) == 1:
+                    acuerdo = acuerdos[0]
+                    acuerdo_idx = 0
+                    origen_acuerdo = "pendiente"
+                if acuerdo is None and len(acuerdos) > 1:
+                    # Fallback 1: por recursos mencionados en el cuerpo.
+                    recursos_mencionados = set(self._extraer_recursos_mencionados(mensaje_original))
+                    candidatos = []
+                    for i, ac in enumerate(acuerdos):
+                        recursos_acuerdo = set(ac.get("recursos_dar", {})) | set(ac.get("recursos_pedir", {}))
+                        if recursos_mencionados and recursos_mencionados.issubset(recursos_acuerdo):
+                            candidatos.append(i)
+                    if len(candidatos) == 1:
+                        acuerdo_idx = candidatos[0]
+                        acuerdo = acuerdos[acuerdo_idx]
+                        origen_acuerdo = "pendiente"
+                    elif len(candidatos) > 1:
+                        # Fallback 2: FIFO entre candidatos.
+                        acuerdo_idx = min(candidatos, key=lambda i: acuerdos[i].get("timestamp", 0))
+                        acuerdo = acuerdos[acuerdo_idx]
+                        origen_acuerdo = "pendiente"
+                        self._log("INFO",
+                                  f"Aceptación de {remitente} sin tx: varios candidatos; "
+                                  f"se aplica FIFO entre coincidencias")
+                    else:
+                        # Fallback 3: FIFO global por remitente.
+                        acuerdo_idx = min(range(len(acuerdos)), key=lambda i: acuerdos[i].get("timestamp", 0))
+                        acuerdo = acuerdos[acuerdo_idx]
+                        origen_acuerdo = "pendiente"
+                        self._log("INFO",
+                                  f"Aceptación de {remitente} sin tx y sin señales claras; "
+                                  f"se aplica FIFO")
+            else:
+                # Sin pendientes activos: intentar expirados del remitente.
+                expirados = [
+                    item for item in self.acuerdos_expirados_por_remitente.get(remitente, [])
+                    if item.get("expira_en", 0) >= ahora
+                ]
+                if expirados:
+                    elegido = min(expirados, key=lambda item: item["acuerdo"].get("timestamp", 0))
+                    acuerdo = elegido.get("acuerdo")
+                    origen_acuerdo = "expirado"
+                    self._log("INFO",
+                              f"Aceptación tardía de {remitente} sin tx: "
+                              f"se recupera acuerdo expirado por FIFO")
+                else:
+                    self._log("INFO", f"Aceptación de {remitente} sin acuerdo pendiente registrado")
+                    return False
+
+        if acuerdo is None:
+            self._log("ERROR", f"Error interno resolviendo acuerdo de {remitente}")
+            return False
 
         recursos_a_enviar = acuerdo.get("recursos_dar", {})
         recursos_a_recibir = acuerdo.get("recursos_pedir", {})
-        
+
         if not recursos_a_enviar:
             self._log("INFO", f"Acuerdo con {remitente} sin recursos a enviar")
             return False
 
-        # Verificar disponibilidad real ANTES de enviar
+        # Verificar disponibilidad y no romper objetivo ANTES de enviar
         self._actualizar_estado()
         mis_recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+        objetivo = self.info_actual.get("Objetivo", {}) if self.info_actual else {}
         for rec, cant in recursos_a_enviar.items():
             disponible = mis_recursos.get(rec, 0)
             if disponible < cant:
@@ -757,15 +932,44 @@ class AgenteNegociador:
                           f"No puedo cumplir acuerdo con {remitente}: "
                           f"necesito {cant} {rec} pero solo tengo {disponible}")
                 return False
+            if rec != "oro":
+                minimo_objetivo = objetivo.get(rec, 0)
+                restante = disponible - cant
+                if restante < minimo_objetivo:
+                    self._log(
+                        "ALERTA",
+                        f"No puedo cumplir acuerdo con {remitente}: "
+                        f"enviar {cant} {rec} rompería objetivo "
+                        f"({rec} quedaría en {restante}/{minimo_objetivo})",
+                    )
+                    return False
 
         envio_str = ", ".join(f"{c} {r}" for r, c in recursos_a_enviar.items())
         recibo_str = ", ".join(f"{c} {r}" for r, c in recursos_a_recibir.items())
-        
-        self._log("DECISION", 
-                  f"🤝 Ejecutando acuerdo con {remitente}: "
+        tx_info = acuerdo.get("tx_id")
+        tx_tag = f" [tx:{tx_info}]" if tx_info else ""
+
+        self._log("DECISION",
+                  f"🤝 Ejecutando acuerdo{tx_tag} con {remitente}: "
                   f"doy {envio_str} por {recibo_str}")
-        
+
         if self._enviar_paquete(remitente, recursos_a_enviar):
+            if origen_acuerdo == "pendiente" and acuerdo_idx is not None:
+                acuerdos_actuales = self.acuerdos_pendientes.get(remitente, [])
+                if 0 <= acuerdo_idx < len(acuerdos_actuales):
+                    acuerdos_actuales.pop(acuerdo_idx)
+                if not acuerdos_actuales:
+                    self.acuerdos_pendientes.pop(remitente, None)
+            if tx_info:
+                self.tx_cerrados[tx_info] = time.time()
+                self.acuerdos_expirados_tx.pop(tx_info, None)
+                if remitente in self.acuerdos_expirados_por_remitente:
+                    self.acuerdos_expirados_por_remitente[remitente] = [
+                        item for item in self.acuerdos_expirados_por_remitente[remitente]
+                        if item.get("acuerdo", {}).get("tx_id") != tx_info
+                    ]
+                    if not self.acuerdos_expirados_por_remitente[remitente]:
+                        del self.acuerdos_expirados_por_remitente[remitente]
             return True
         else:
             self._log("ERROR", f"No se pudo enviar paquete a {remitente}")
@@ -803,6 +1007,7 @@ class AgenteNegociador:
         r'|^\s*Por ahora no.*Saludos',
         _re.IGNORECASE | _re.DOTALL,
     )
+    _RE_TX_ID = _re.compile(r'\[tx:([a-z0-9_-]{6,64})\]', _re.IGNORECASE)
 
     def _extraer_recursos_mencionados(self, mensaje: str) -> List[str]:
         """Extrae recursos conocidos mencionados en un mensaje de texto."""
@@ -813,6 +1018,16 @@ class AgenteNegociador:
             if _re.search(r'\b' + _re.escape(recurso) + r'\b', msg_lower):
                 encontrados.append(recurso)
         return encontrados
+
+    def _extraer_tx_id(self, *textos: str) -> Optional[str]:
+        """Extrae tx_id de asunto/cuerpo si existe el tag [tx:...]."""
+        for texto in textos:
+            if not texto:
+                continue
+            m = self._RE_TX_ID.search(texto)
+            if m:
+                return m.group(1).lower()
+        return None
 
     def _generar_propuesta_adaptada(self, destinatario: str,
                                      recursos_que_quiere: List[str],
@@ -848,9 +1063,11 @@ class AgenteNegociador:
 
         ofrezco_str = ", ".join(f"{c} {r}" for r, c in ofrezco.items())
         pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
+        tx_id = self._nuevo_tx_id()
 
         cuerpo = (
             f"Hola {destinatario}, soy {self.alias}. "
+            f"[tx:{tx_id}] "
             f"He visto que necesitas {ofrezco_str}. "
             f"Te propongo un intercambio: "
             f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
@@ -860,10 +1077,11 @@ class AgenteNegociador:
         )
 
         return {
-            "asunto": f"Propuesta: mi {ofrezco_str} por tu {pido_str}",
+            "asunto": f"Propuesta: [tx:{tx_id}] mi {ofrezco_str} por tu {pido_str}",
             "cuerpo": cuerpo,
             "_ofrezco": ofrezco,
             "_pido": pido,
+            "_tx_id": tx_id,
         }
 
     def _es_carta_sistema(self, remitente: str, mensaje: str) -> bool:
@@ -1037,15 +1255,15 @@ class AgenteNegociador:
                     if propuesta:
                         self._log("DECISION",
                                   f"PROPUESTA ADAPTADA a {remitente}: "
-                                  f"dar={propuesta['_ofrezco']}, pedir={propuesta['_pido']}")
+                                  f"dar={propuesta['_ofrezco']}, pedir={propuesta['_pido']} "
+                                  f"[tx:{propuesta.get('_tx_id')}]")
                         if self._enviar_carta(remitente, propuesta["asunto"], propuesta["cuerpo"]):
-                            if remitente not in self.acuerdos_pendientes:
-                                self.acuerdos_pendientes[remitente] = []
-                            self.acuerdos_pendientes[remitente].append({
-                                "recursos_dar": propuesta["_ofrezco"],
-                                "recursos_pedir": propuesta["_pido"],
-                                "timestamp": time.time(),
-                            })
+                            self._registrar_acuerdo_pendiente(
+                                remitente,
+                                propuesta["_ofrezco"],
+                                propuesta["_pido"],
+                                propuesta["_tx_id"],
+                            )
                             for r_o in propuesta["_ofrezco"]:
                                 for r_p in propuesta["_pido"]:
                                     self.propuestas_enviadas[(remitente, r_o, r_p)] = self.ronda_actual
@@ -1066,7 +1284,7 @@ class AgenteNegociador:
             # ── Filtro 3: aceptaciones textuales → sin IA ──
             if self._es_aceptacion_simple(mensaje, asunto):
                 self._log("ANALISIS", f"{remitente} ACEPTA intercambio (detectado por texto, sin IA)")
-                if self._responder_aceptacion(remitente, mensaje):
+                if self._responder_aceptacion(remitente, mensaje, asunto):
                     intercambios += 1
                 cartas_procesadas.append(uid)
                 continue
@@ -1083,7 +1301,7 @@ class AgenteNegociador:
             # ── ¿Aceptación? → responder ──
             if r.es_aceptacion:
                 self._log("ANALISIS", f"{remitente} ACEPTA intercambio")
-                if self._responder_aceptacion(remitente, mensaje):
+                if self._responder_aceptacion(remitente, mensaje, asunto):
                     intercambios += 1
                 cartas_procesadas.append(uid)
                 continue
@@ -1124,11 +1342,13 @@ class AgenteNegociador:
                 if envio_valido and recursos_a_enviar:
                     ofrecen_str = ", ".join(f"{c} {r}" for r, c in r.ofrecen.items())
                     enviado_str = ", ".join(f"{c} {r}" for r, c in recursos_a_enviar.items())
+                    tx_id_mensaje = self._extraer_tx_id(asunto, mensaje)
+                    tx_tag = f" [tx:{tx_id_mensaje}]" if tx_id_mensaje else ""
                     self._log("EXITO", f"🤝 ACEPTO oferta de {remitente}: doy {enviado_str} por {ofrecen_str}")
                     if self._enviar_paquete(remitente, recursos_a_enviar):
                         self._enviar_carta(
                             remitente, f"Re: {asunto}",
-                            f"Acepto el trato. Te he enviado {enviado_str}. "
+                            f"Acepto el trato{tx_tag}. Te he enviado {enviado_str}. "
                             f"Espero recibir {ofrecen_str} de tu parte. "
                             f"Saludos, {self.alias}",
                         )
@@ -1154,17 +1374,17 @@ class AgenteNegociador:
                     if contra:
                         self._log("DECISION",
                                   f"CONTRAOFERTA a {remitente}: "
-                                  f"dar={contra['_ofrezco']}, pedir={contra['_pido']}")
+                                  f"dar={contra['_ofrezco']}, pedir={contra['_pido']} "
+                                  f"[tx:{contra.get('_tx_id')}]")
                         self._enviar_carta(
                             remitente, contra["asunto"], contra["cuerpo"])
                         # Registrar acuerdo pendiente
-                        if remitente not in self.acuerdos_pendientes:
-                            self.acuerdos_pendientes[remitente] = []
-                        self.acuerdos_pendientes[remitente].append({
-                            "recursos_dar": contra["_ofrezco"],
-                            "recursos_pedir": contra["_pido"],
-                            "timestamp": time.time(),
-                        })
+                        self._registrar_acuerdo_pendiente(
+                            remitente,
+                            contra["_ofrezco"],
+                            contra["_pido"],
+                            contra["_tx_id"],
+                        )
                         cartas_procesadas.append(uid)
                         continue
 
@@ -1203,14 +1423,12 @@ class AgenteNegociador:
 
             if self._enviar_carta(jugador, propuesta["asunto"], propuesta["cuerpo"]):
                 self.contactados_esta_ronda.append(jugador)
-                acuerdo = {
-                    "recursos_dar": propuesta["_ofrezco"],
-                    "recursos_pedir": propuesta["_pido"],
-                    "timestamp": time.time(),
-                }
-                if jugador not in self.acuerdos_pendientes:
-                    self.acuerdos_pendientes[jugador] = []
-                self.acuerdos_pendientes[jugador].append(acuerdo)
+                self._registrar_acuerdo_pendiente(
+                    jugador,
+                    propuesta["_ofrezco"],
+                    propuesta["_pido"],
+                    propuesta["_tx_id"],
+                )
 
                 # Registrar en memoria de propuestas
                 for r_o in propuesta["_ofrezco"]:
@@ -1218,7 +1436,8 @@ class AgenteNegociador:
                         self.propuestas_enviadas[(jugador, r_o, r_p)] = self.ronda_actual
 
                 self._log("INFO", f"Acuerdo pendiente con {jugador}: "
-                          f"dar={propuesta['_ofrezco']}, pedir={propuesta['_pido']}")
+                          f"dar={propuesta['_ofrezco']}, pedir={propuesta['_pido']} "
+                          f"[tx:{propuesta.get('_tx_id')}]")
 
             time.sleep(self.pausa_entre_acciones)
 
@@ -1229,21 +1448,32 @@ class AgenteNegociador:
         self.ronda_actual += 1
         _inicio_ronda = time.time()
 
-        # Limpiar acuerdos viejos (>90s ≈ 2-3 rondas sin respuesta)
+        # Mover acuerdos pendientes antiguos a caché temporal por tx
+        # para tolerar aceptaciones tardías.
         ahora = time.time()
-        _ACUERDO_TTL = 90  # segundos
         for persona in list(self.acuerdos_pendientes.keys()):
-            viejos = [a for a in self.acuerdos_pendientes[persona]
-                      if ahora - a.get("timestamp", 0) >= _ACUERDO_TTL]
-            if viejos:
-                self._log("INFO", f"Liberando {len(viejos)} acuerdo(s) pendiente(s) "
-                          f"con {persona} (sin respuesta en {_ACUERDO_TTL}s)")
-            self.acuerdos_pendientes[persona] = [
-                a for a in self.acuerdos_pendientes[persona]
-                if ahora - a.get("timestamp", 0) < _ACUERDO_TTL
-            ]
-            if not self.acuerdos_pendientes[persona]:
+            acuerdos_activos = []
+            acuerdos_expirados = []
+            for acuerdo in self.acuerdos_pendientes[persona]:
+                if ahora - acuerdo.get("timestamp", 0) < self.ACUERDO_TTL_SEGUNDOS:
+                    acuerdos_activos.append(acuerdo)
+                else:
+                    acuerdos_expirados.append(acuerdo)
+                    self._mover_a_expirados_por_tx(persona, acuerdo, ahora)
+
+            if acuerdos_expirados:
+                self._log(
+                    "INFO",
+                    f"Moviendo {len(acuerdos_expirados)} acuerdo(s) de {persona} "
+                    f"a caché de expirados (TTL activo={self.ACUERDO_TTL_SEGUNDOS}s, "
+                    f"gracia={self.ACUERDO_GRACIA_TTL_SEGUNDOS}s)",
+                )
+            if acuerdos_activos:
+                self.acuerdos_pendientes[persona] = acuerdos_activos
+            else:
                 del self.acuerdos_pendientes[persona]
+
+        self._limpiar_cache_tx(ahora)
 
         # Limpiar propuestas_enviadas antiguas para poder reintentar
         claves_viejas = [
