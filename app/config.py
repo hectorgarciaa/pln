@@ -5,8 +5,17 @@ Usa pydantic BaseModel para validar tipos y valores por defecto.
 Se puede sobreescribir cualquier campo al instanciar Settings().
 """
 
+import os
 from pydantic import BaseModel, Field
 from typing import Dict, List, Tuple
+
+
+def _default_butler_address() -> str:
+    """Resuelve la URL base del butler desde el entorno."""
+    butler_address = os.getenv("FDI_PLN__BUTLER_ADDRESS", "").strip()
+    if butler_address:
+        return butler_address.rstrip("/")
+    return "http://127.0.0.1:7719"
 
 
 class OllamaParams(BaseModel):
@@ -26,8 +35,7 @@ class Settings(BaseModel):
     """Configuración global del proyecto — todos los valores son validados."""
 
     # ── URLs ─────────────────────────────────────────────────────────────
-    api_base_aux: str = "http://147.96.81.252:7719"
-    api_base_url: str = "http://147.0.0.1:7719"
+    api_base_url: str = Field(default_factory=_default_butler_address)
     ollama_url: str = "http://127.0.0.1:11434"
 
     # ── Modelos de IA ────────────────────────────────────────────────────

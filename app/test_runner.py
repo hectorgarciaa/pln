@@ -50,7 +50,7 @@ console = Console()
 # ── Utilidades ───────────────────────────────────────────────────────────
 
 def construir_comando(alias: str, modelo: str, max_rondas: int,
-                      pausa: int, debug: bool, source_ip: str = None) -> list[str]:
+                      pausa: int, debug: bool) -> list[str]:
     """Construye la lista de argumentos para lanzar un bot."""
     cmd = [
         sys.executable, str(MAIN_SCRIPT),
@@ -61,8 +61,6 @@ def construir_comando(alias: str, modelo: str, max_rondas: int,
     ]
     if debug:
         cmd.append("--debug")
-    if source_ip:
-        cmd.extend(["--source-ip", source_ip])
     return cmd
 
 
@@ -77,12 +75,11 @@ def lanzar_modo_logs(aliases: list[str], modelo: str, max_rondas: int,
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
 
-    for i, alias in enumerate(aliases):
-        source_ip = f"127.0.0.{i + 1}"
+    for alias in aliases:
         log_path = LOGS_DIR / f"{alias}_{timestamp}.log"
         log_file = open(log_path, "w", encoding="utf-8")
 
-        cmd = construir_comando(alias, modelo, max_rondas, pausa, debug, source_ip)
+        cmd = construir_comando(alias, modelo, max_rondas, pausa, debug)
         proc = subprocess.Popen(
             cmd,
             stdout=log_file,
@@ -118,9 +115,8 @@ def lanzar_modo_consola(aliases: list[str], modelo: str, max_rondas: int,
             stream.close()
 
     for i, alias in enumerate(aliases):
-        source_ip = f"127.0.0.{i + 1}"
         estilo = ESTILOS[i % len(ESTILOS)]
-        cmd = construir_comando(alias, modelo, max_rondas, pausa, debug, source_ip)
+        cmd = construir_comando(alias, modelo, max_rondas, pausa, debug)
         proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,

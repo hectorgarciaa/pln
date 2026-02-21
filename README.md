@@ -109,14 +109,20 @@ Lanza el bot directamente sin menú interactivo.
 | `--max-rondas` | `-r` | `10` | Número máximo de rondas de negociación. |
 | `--pausa` | `-p` | `30` | Segundos de espera entre rondas (para dar tiempo a respuestas). |
 | `--source-ip` | — | *(ninguno)* | IP local de origen para diferenciar jugadores en el butler. |
-| `--api-url` | — | *(de config)* | URL base de la API del juego (por defecto `http://127.0.0.1:7719`). |
+| `--api-url` | — | *(ninguno)* | Override explícito de la URL base de la API (si no se indica, se usa `FDI_PLN__BUTLER_ADDRESS`). |
 | `--help` | `-h` | — | Muestra la ayuda. |
+
+Nota para Butler `--monopuesto`: el bot envía automáticamente `agente=<alias_del_bot>` en las llamadas API que lo requieren (`/info`, `/paquete`, `/mail/{uid}`).
 
 #### Ejemplos
 
 ```bash
 # Bot con modelo rápido y debug
 uv run app/main.py -a Bot_1 -m llama3.2:3b -d
+
+# Tomar URL del butler desde variable de entorno
+export FDI_PLN__BUTLER_ADDRESS=http://127.0.0.1:7719
+uv run app/main.py -a Bot_1
 
 # Bot silencioso, 20 rondas, pausa corta
 uv run app/main.py -a Negociador -r 20 -p 10
@@ -130,6 +136,8 @@ uv run app/main.py -a Bot_1 --api-url http://192.168.1.100:7719
 ### `test_runner.py` — Orquestador multi-bot
 
 Lanza N bots en paralelo, cada uno como un subproceso independiente de `main.py`.
+Para pruebas locales con Butler en `--monopuesto`, no usa bindeo de IP:
+cada bot se identifica por su alias mediante el parámetro `agente`.
 
 ```bash
 uv run app/test_runner.py -n 5 --consola
@@ -203,11 +211,16 @@ Cada ronda el agente:
 
 ## ⚙️ Configuración
 
-La configuración se gestiona en `app/config.py` con modelos **pydantic**. Los valores por defecto son:
+La configuración se gestiona en `app/config.py` con modelos **pydantic**.
+La URL del butler se obtiene de `FDI_PLN__BUTLER_ADDRESS` y, si no existe, cae en `http://127.0.0.1:7719`.
+El flag `--api-url` tiene prioridad sobre ambos valores.
+Con Butler en modo `--monopuesto`, el cliente usa también el alias del bot como identificador `agente`.
+
+Valores principales:
 
 | Parámetro | Valor | Descripción |
 |-----------|-------|-------------|
-| `api_base_url` | `http://127.0.0.1:7719` | URL del servidor del juego |
+| `api_base_url` | `FDI_PLN__BUTLER_ADDRESS` o `http://127.0.0.1:7719` | URL del servidor del juego |
 | `ollama_url` | `http://127.0.0.1:11434` | URL de Ollama |
 | `modelo_default` | `qwen3:8b` | Modelo de IA por defecto |
 | `think_timeout` | `25` | Máx. segundos de bloque `<think>` antes de cortar |

@@ -29,14 +29,26 @@ class SourceIPAdapter(HTTPAdapter):
 class APIClient:
     """Cliente para interactuar con la API del juego."""
 
-    def __init__(self, base_url: str = None, source_ip: str = None):
+    def __init__(self, base_url: str = None, source_ip: str = None, agente: str = None):
         self.base_url = base_url or API_BASE_URL
+        self.agente = agente
         self.session = requests.Session()
         if source_ip:
             adapter = SourceIPAdapter(source_ip)
             self.session.mount("http://", adapter)
             self.session.mount("https://", adapter)
             logger.debug("Bindeado a IP local {}", source_ip)
+        if agente:
+            logger.debug("Usando identificador de agente {}", agente)
+
+    def _params(self, extra: Dict[str, str] = None) -> Optional[Dict[str, str]]:
+        """Añade el parámetro `agente` cuando está configurado."""
+        params: Dict[str, str] = {}
+        if extra:
+            params.update(extra)
+        if self.agente and "agente" not in params:
+            params["agente"] = self.agente
+        return params or None
 
     # =====================================================================
     # INFORMACIÓN
@@ -45,7 +57,7 @@ class APIClient:
     def get_info(self) -> Optional[Dict]:
         """Obtiene información general del jugador."""
         try:
-            response = self.session.get(f"{self.base_url}/info")
+            response = self.session.get(f"{self.base_url}/info", params=self._params())
             if response.status_code == 200:
                 return response.json()
             logger.warning("Error obteniendo info: status {}", response.status_code)
@@ -86,7 +98,10 @@ class APIClient:
     def crear_alias(self, nombre: str) -> bool:
         """Crea un nuevo alias."""
         try:
-            response = self.session.post(f"{self.base_url}/alias/{nombre}")
+            response = self.session.post(
+                f"{self.base_url}/alias/{nombre}",
+                params=self._params(),
+            )
             if response.status_code == 200:
                 logger.success("Alias '{}' creado", nombre)
                 return True
@@ -99,7 +114,10 @@ class APIClient:
     def eliminar_alias(self, nombre: str) -> bool:
         """Elimina un alias."""
         try:
-            response = self.session.delete(f"{self.base_url}/alias/{nombre}")
+            response = self.session.delete(
+                f"{self.base_url}/alias/{nombre}",
+                params=self._params(),
+            )
             if response.status_code == 200:
                 logger.success("Alias '{}' eliminado", nombre)
                 return True
@@ -124,7 +142,11 @@ class APIClient:
             "id": id_carta or f"carta_{remitente}_{int(time.time())}",
         }
         try:
-            response = self.session.post(f"{self.base_url}/carta", json=carta_data)
+            response = self.session.post(
+                f"{self.base_url}/carta",
+                params=self._params(),
+                json=carta_data,
+            )
             if response.status_code == 200:
                 return True
             logger.warning("Error enviando carta: status {}", response.status_code)
@@ -136,7 +158,10 @@ class APIClient:
     def eliminar_carta(self, uid: str) -> bool:
         """Elimina una carta del buzón."""
         try:
-            response = self.session.delete(f"{self.base_url}/mail/{uid}")
+            response = self.session.delete(
+                f"{self.base_url}/mail/{uid}",
+                params=self._params(),
+            )
             return response.status_code == 200
         except requests.RequestException as e:
             logger.error("Error eliminando carta: {}", e)
@@ -151,13 +176,14 @@ class APIClient:
         try:
             response = self.session.post(
                 f"{self.base_url}/paquete/{destinatario}",
+                params=self._params(),
                 json=recursos,
             )
             # Si 404, probar con query param
             if response.status_code == 404:
                 response = self.session.post(
                     f"{self.base_url}/paquete",
-                    params={"dest": destinatario},
+                    params=self._params({"dest": destinatario}),
                     json=recursos,
                 )
             if response.status_code == 200:
