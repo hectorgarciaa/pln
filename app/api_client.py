@@ -7,7 +7,7 @@ Usa loguru para logging en vez de print().
 
 import time
 import requests
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from loguru import logger
 from config import API_BASE_URL
@@ -16,10 +16,20 @@ from config import API_BASE_URL
 class APIClient:
     """Cliente para interactuar con la API del juego."""
 
-    def __init__(self, base_url: str = None, agente: str = None):
+    def __init__(
+        self,
+        base_url: str = None,
+        agente: str = None,
+        timeout: Tuple[float, float] = (5.0, 20.0),
+        max_retries: int = 2,
+        retry_backoff: float = 0.5,
+    ):
         self.base_url = base_url or API_BASE_URL
         self.agente = agente
         self.session = requests.Session()
+        self.timeout = timeout
+        self.max_retries = max_retries
+        self.retry_backoff = retry_backoff
         if agente:
             logger.debug("Usando identificador de agente {}", agente)
 
@@ -32,53 +42,75 @@ class APIClient:
             params["agente"] = self.agente
         return params or None
 
+    def _request(self, method: str, path: str, **kwargs) -> Optional[requests.Response]:
+        """Realiza una petición HTTP con timeout y reintentos básicos."""
+        timeout = kwargs.pop("timeout", self.timeout)
+        url = f"{self.base_url}{path}"
+        ultimo_error: Optional[Exception] = None
+
+        for intento in range(1, self.max_retries + 2):
+            try:
+                return self.session.request(method, url, timeout=timeout, **kwargs)
+            except requests.RequestException as e:
+                ultimo_error = e
+                if intento > self.max_retries:
+                    break
+                espera = self.retry_backoff * intento
+                logger.warning(
+                    "HTTP {} {} falló (intento {}/{}): {}. Reintentando en {:.1f}s",
+                    method,
+                    path,
+                    intento,
+                    self.max_retries + 1,
+                    e,
+                    espera,
+                )
+                time.sleep(espera)
+
+        logger.error("HTTP {} {} falló definitivamente: {}", method, path, ultimo_error)
+        return None
+
     # =====================================================================
     # INFORMACIÓN
     # =====================================================================
 
     def get_info(self) -> Optional[Dict]:
         """Obtiene información general del jugador."""
-        try:
-            response = self.session.get(f"{self.base_url}/info", params=self._params())
-            if response.status_code == 200:
-                return response.json()
-            logger.warning("Error obteniendo info: status {}", response.status_code)
+        response = self._request("GET", "/info", params=self._params())
+        if response is None:
             return None
-        except requests.RequestException as e:
-            logger.error("Error de conexión (info): {}", e)
-            return None
+        if response.status_code == 200:
+            return response.json()
+        logger.warning("Error obteniendo info: status {}", response.status_code)
+        return None
 
     def get_gente(self) -> List[str]:
         """Obtiene lista de personas disponibles."""
-        try:
-            response = self.session.get(f"{self.base_url}/gente")
-            if response.status_code == 200:
-                data = response.json()
-                # Normalizar: la API puede devolver ["str"] o [{"nombre": ...}]
-                resultado = []
-                for item in data:
-                    if isinstance(item, str):
-                        resultado.append(item)
-                    elif isinstance(item, dict):
-                        # Intentar extraer el nombre del dict
-                        nombre = (
-                            item.get("nombre")
-                            or item.get("name")
-                            or item.get("alias")
-                            or str(item)
-                        )
-                        logger.debug(
-                            "get_gente: item dict normalizado {} -> {}", item, nombre
-                        )
-                        resultado.append(nombre)
-                    else:
-                        resultado.append(str(item))
-                return resultado
-            logger.warning("Error obteniendo gente: status {}", response.status_code)
+        response = self._request("GET", "/gente")
+        if response is None:
             return []
-        except requests.RequestException as e:
-            logger.error("Error de conexión (gente): {}", e)
-            return []
+        if response.status_code == 200:
+            data = response.json()
+            # Normalizar: la API puede devolver ["str"] o [{"nombre": ...}]
+            resultado = []
+            for item in data:
+                if isinstance(item, str):
+                    resultado.append(item)
+                elif isinstance(item, dict):
+                    # Intentar extraer el nombre del dict
+                    nombre = (
+                        item.get("nombre")
+                        or item.get("name")
+                        or item.get("alias")
+                        or str(item)
+                    )
+                    logger.debug("get_gente: item dict normalizado {} -> {}", item, nombre)
+                    resultado.append(nombre)
+                else:
+                    resultado.append(str(item))
+            return resultado
+        logger.warning("Error obteniendo gente: status {}", response.status_code)
+        return []
 
     # =====================================================================
     # ALIAS
@@ -86,35 +118,33 @@ class APIClient:
 
     def crear_alias(self, nombre: str) -> bool:
         """Crea un nuevo alias."""
-        try:
-            response = self.session.post(
-                f"{self.base_url}/alias/{nombre}",
-                params=self._params(),
-            )
-            if response.status_code == 200:
-                logger.success("Alias '{}' creado", nombre)
-                return True
-            logger.warning("Error creando alias: status {}", response.status_code)
+        response = self._request(
+            "POST",
+            f"/alias/{nombre}",
+            params=self._params(),
+        )
+        if response is None:
             return False
-        except requests.RequestException as e:
-            logger.error("Error de conexión (crear alias): {}", e)
-            return False
+        if response.status_code == 200:
+            logger.success("Alias '{}' creado", nombre)
+            return True
+        logger.warning("Error creando alias: status {}", response.status_code)
+        return False
 
     def eliminar_alias(self, nombre: str) -> bool:
         """Elimina un alias."""
-        try:
-            response = self.session.delete(
-                f"{self.base_url}/alias/{nombre}",
-                params=self._params(),
-            )
-            if response.status_code == 200:
-                logger.success("Alias '{}' eliminado", nombre)
-                return True
-            logger.warning("Error eliminando alias: status {}", response.status_code)
+        response = self._request(
+            "DELETE",
+            f"/alias/{nombre}",
+            params=self._params(),
+        )
+        if response is None:
             return False
-        except requests.RequestException as e:
-            logger.error("Error de conexión (eliminar alias): {}", e)
-            return False
+        if response.status_code == 200:
+            logger.success("Alias '{}' eliminado", nombre)
+            return True
+        logger.warning("Error eliminando alias: status {}", response.status_code)
+        return False
 
     # =====================================================================
     # CARTAS
@@ -136,31 +166,29 @@ class APIClient:
             "cuerpo": cuerpo,
             "id": id_carta or f"carta_{remitente}_{int(time.time())}",
         }
-        try:
-            response = self.session.post(
-                f"{self.base_url}/carta",
-                params=self._params(),
-                json=carta_data,
-            )
-            if response.status_code == 200:
-                return True
-            logger.warning("Error enviando carta: status {}", response.status_code)
+        response = self._request(
+            "POST",
+            "/carta",
+            params=self._params(),
+            json=carta_data,
+        )
+        if response is None:
             return False
-        except requests.RequestException as e:
-            logger.error("Error de conexión (enviar carta): {}", e)
-            return False
+        if response.status_code == 200:
+            return True
+        logger.warning("Error enviando carta: status {}", response.status_code)
+        return False
 
     def eliminar_carta(self, uid: str) -> bool:
         """Elimina una carta del buzón."""
-        try:
-            response = self.session.delete(
-                f"{self.base_url}/mail/{uid}",
-                params=self._params(),
-            )
-            return response.status_code == 200
-        except requests.RequestException as e:
-            logger.error("Error eliminando carta: {}", e)
+        response = self._request(
+            "DELETE",
+            f"/mail/{uid}",
+            params=self._params(),
+        )
+        if response is None:
             return False
+        return response.status_code == 200
 
     # =====================================================================
     # PAQUETES
@@ -168,30 +196,33 @@ class APIClient:
 
     def enviar_paquete(self, destinatario: str, recursos: Dict[str, int]) -> bool:
         """Envía un paquete de recursos a otro jugador."""
-        try:
-            response = self.session.post(
-                f"{self.base_url}/paquete/{destinatario}",
-                params=self._params(),
+        response = self._request(
+            "POST",
+            f"/paquete/{destinatario}",
+            params=self._params(),
+            json=recursos,
+        )
+        if response is None:
+            return False
+        # Si 404, probar con query param
+        if response.status_code == 404:
+            response = self._request(
+                "POST",
+                "/paquete",
+                params=self._params({"dest": destinatario}),
                 json=recursos,
             )
-            # Si 404, probar con query param
-            if response.status_code == 404:
-                response = self.session.post(
-                    f"{self.base_url}/paquete",
-                    params=self._params({"dest": destinatario}),
-                    json=recursos,
-                )
-            if response.status_code == 200:
-                return True
-            elif response.status_code == 422:
-                logger.warning("Error de validación: {}", response.json())
-            else:
-                logger.warning(
-                    "Error enviando paquete: {} - {}",
-                    response.status_code,
-                    response.text,
-                )
-            return False
-        except requests.RequestException as e:
-            logger.error("Error de conexión (enviar paquete): {}", e)
-            return False
+            if response is None:
+                return False
+
+        if response.status_code == 200:
+            return True
+        if response.status_code == 422:
+            logger.warning("Error de validación: {}", response.json())
+        else:
+            logger.warning(
+                "Error enviando paquete: {} - {}",
+                response.status_code,
+                response.text,
+            )
+        return False

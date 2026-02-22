@@ -12,7 +12,6 @@ Usa loguru para logging, rich para la interfaz de terminal y
 pydantic para validar las respuestas JSON de la IA.
 """
 
-import json
 import os
 import re as _re
 import sys
@@ -38,47 +37,6 @@ from ollama_client import OllamaClient
 
 # ── Rich console compartida ─────────────────────────────────────────────
 console = Console()
-
-
-# =========================================================================
-# MODELOS PYDANTIC — respuestas de la IA
-# =========================================================================
-
-
-class RespuestaAceptacion(BaseModel):
-    """Respuesta de la IA al detectar aceptaciones."""
-
-    es_aceptacion: bool = False
-    razon: str = ""
-
-
-class RespuestaAnalisis(BaseModel):
-    """Respuesta de la IA al analizar un mensaje de negociación.
-
-    Usa validadores para tolerar respuestas malformadas de la IA
-    (p.ej. contraoferta_pedir como lista en vez de dict).
-    """
-
-    ofrecen: Dict[str, int] = Field(default_factory=dict)
-    piden: Dict[str, int] = Field(default_factory=dict)
-    aceptar: bool = False
-    razon: str = ""
-    contraoferta: bool = False
-    contraoferta_dar: Dict[str, int] = Field(default_factory=dict)
-    contraoferta_pedir: Dict[str, int] = Field(default_factory=dict)
-
-    from pydantic import field_validator
-
-    @field_validator(
-        "ofrecen", "piden", "contraoferta_dar", "contraoferta_pedir", mode="before"
-    )
-    @classmethod
-    def _coerce_to_dict(cls, v: Any) -> Dict[str, int]:
-        """Convierte valores no-dict a dict vacío en vez de fallar."""
-        if isinstance(v, dict):
-            # Asegurar que las claves son str y valores int
-            return {str(k): int(val) for k, val in v.items() if val is not None}
-        return {}
 
 
 class RespuestaUnificada(BaseModel):
@@ -349,17 +307,6 @@ class AgenteNegociador:
     # ANÁLISIS DE MENSAJES (IA + pydantic)
     # =====================================================================
 
-    def _parsear_json_ia(self, respuesta: str) -> Optional[dict]:
-        """Extrae el primer objeto JSON de una respuesta de texto."""
-        inicio = respuesta.find("{")
-        fin = respuesta.rfind("}") + 1
-        if inicio != -1 and fin > inicio:
-            try:
-                return json.loads(respuesta[inicio:fin])
-            except json.JSONDecodeError:
-                pass
-        return None
-
     def _decidir_aceptar_programatico(
         self,
         ofrecen: Dict[str, int],
@@ -387,9 +334,7 @@ class AgenteNegociador:
             return False, "no ofrecen nada de lo que necesito"
         return False, "piden recursos que no me sobran o no tengo suficientes"
 
-    def _analizar_mensaje(
-        self, remitente: str, mensaje: str, necesidades: Dict, excedentes: Dict
-    ) -> RespuestaUnificada:
+    def _analizar_mensaje(self, remitente: str, mensaje: str) -> RespuestaUnificada:
         """Analiza un mensaje con UNA sola llamada IA (aceptación + extracción).
 
         Devuelve RespuestaUnificada con todos los campos.
@@ -1423,7 +1368,7 @@ class AgenteNegociador:
                 continue
 
             # ── Análisis unificado (1 sola llamada IA) ──
-            r = self._analizar_mensaje(remitente, mensaje, necesidades, excedentes)
+            r = self._analizar_mensaje(remitente, mensaje)
 
             # ── ¿Aceptación? → responder ──
             if r.es_aceptacion:
@@ -1452,12 +1397,10 @@ class AgenteNegociador:
             # ── Decisión: aceptar ──
             if aceptar and r.piden:
                 # VALIDAR antes de enviar: ¿me piden cosas que realmente me sobran?
-                self._actualizar_estado()
+                estado_fresco = self._actualizar_estado()
                 mis_recursos = (
                     self.info_actual.get("Recursos", {}) if self.info_actual else {}
                 )
-                # Recalcular excedentes con estado fresco
-                estado_fresco = self._actualizar_estado()
                 excedentes_frescos = (
                     estado_fresco.get("excedentes", {}) if estado_fresco else {}
                 )
