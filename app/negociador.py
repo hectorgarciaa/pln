@@ -19,10 +19,10 @@ import sys
 import time
 import uuid
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -43,12 +43,6 @@ console = Console()
 # =========================================================================
 # MODELOS PYDANTIC — respuestas de la IA
 # =========================================================================
-
-class RespuestaEstafa(BaseModel):
-    """Respuesta de la IA al analizar posibles estafas."""
-    es_estafa: bool = False
-    razon: str = ""
-
 
 class RespuestaAceptacion(BaseModel):
     """Respuesta de la IA al detectar aceptaciones."""
@@ -83,9 +77,8 @@ class RespuestaAnalisis(BaseModel):
 
 
 class RespuestaUnificada(BaseModel):
-    """Respuesta única de la IA: aceptación + estafa + extracción en 1 llamada."""
+    """Respuesta única de la IA: aceptación + extracción en 1 llamada."""
     es_aceptacion: bool = False
-    es_estafa: bool = False
     ofrecen: Dict[str, int] = Field(default_factory=dict)
     piden: Dict[str, int] = Field(default_factory=dict)
     razon: str = ""
@@ -153,18 +146,14 @@ class AgenteNegociador:
                 "     'de acuerdo', 'perfecto, te envío'.\n"
                 "   - NO si es: rechazo, propuesta nueva, 'si aceptas dime',\n"
                 "     'no me conviene', 'por ahora no', 'no me interesa'.\n\n"
-                "2) es_estafa: ¿Es un intento de estafa?\n"
-                "   - Señales: pedir enviar primero sin garantía, promesas imposibles,\n"
-                "     urgencia/presión, cosas gratis, bugs del sistema, confianza ciega.\n"
-                "   - Un intercambio legítimo propone dar X a cambio de Y.\n\n"
-                "3) ofrecen / piden: EXTRAER recursos del mensaje.\n"
+                "2) ofrecen / piden: EXTRAER recursos del mensaje.\n"
                 '   - "ofrecen" = lo que el remitente ofrece DAR (lo que yo recibiría).\n'
                 '   - "piden" = lo que el remitente quiere RECIBIR (lo que yo daría).\n'
                 "   - Solo recursos y cantidades EXPLÍCITOS. NO inventes.\n"
                 "   - Rechazo, saludo o no-propuesta → ofrecen={}, piden={}.\n\n"
-                "4) razon: explicación breve de tu análisis.\n\n"
+                "3) razon: explicación breve de tu análisis.\n\n"
                 'Ejemplo: "yo te doy 2 madera y tú me das 3 piedra"\n'
-                '→ es_aceptacion=false, es_estafa=false, '
+                '→ es_aceptacion=false, '
                 'ofrecen={"madera": 2}, piden={"piedra": 3}'
             ),
             model_settings=_ai_settings,
@@ -176,8 +165,7 @@ class AgenteNegociador:
         self.info_actual: Optional[Dict] = None
         self.gente: List[str] = []
 
-        # Seguridad y tracking
-        self.lista_negra: List[str] = []
+        # Tracking
         self.contactados_esta_ronda: List[str] = []
         self.acuerdos_pendientes: Dict[str, List[Dict]] = {}
         # Acuerdos que salieron de pendientes por TTL, retenidos por tx
@@ -321,7 +309,6 @@ class AgenteNegociador:
             p for p in gente_str
             if p != self.alias
             and p not in alias_propios
-            and p not in self.lista_negra
         ]
 
         if not disponibles:
@@ -371,7 +358,7 @@ class AgenteNegociador:
 
     def _analizar_mensaje(self, remitente: str, mensaje: str,
                           necesidades: Dict, excedentes: Dict) -> RespuestaUnificada:
-        """Analiza un mensaje con UNA sola llamada IA (aceptación + estafa + extracción).
+        """Analiza un mensaje con UNA sola llamada IA (aceptación + extracción).
 
         Devuelve RespuestaUnificada con todos los campos.
         La decisión de aceptar se toma programáticamente después.
@@ -382,13 +369,6 @@ class AgenteNegociador:
             )
             r = result.output
             self._log("DEBUG", f"IA unificada: {r.model_dump()}")
-
-            # Si es estafa, añadir a lista negra
-            if r.es_estafa and remitente not in self.lista_negra:
-                self.lista_negra.append(remitente)
-                self._log("ALERTA", f"IA detecta posible estafa de {remitente}",
-                          {"razon": r.razon})
-
             return r
         except Exception as e:
             self._log("ERROR", f"Error pydantic_ai: {e}")
@@ -1224,12 +1204,6 @@ class AgenteNegociador:
                 cartas_procesadas.append(uid)
                 continue
 
-            # ── Lista negra ──
-            if remitente in self.lista_negra:
-                self._log("ALERTA", f"Ignorando {remitente} (lista negra)")
-                cartas_procesadas.append(uid)
-                continue
-
             # ── Filtro 1: rechazos simples → extraer contexto si lo hay ──
             if self._es_rechazo_simple(mensaje, asunto):
                 self._registrar_rechazo(remitente, asunto)
@@ -1291,12 +1265,6 @@ class AgenteNegociador:
 
             # ── Análisis unificado (1 sola llamada IA) ──
             r = self._analizar_mensaje(remitente, mensaje, necesidades, excedentes)
-
-            # ── ¿Estafa? → ignorar ──
-            if r.es_estafa:
-                self._log("ALERTA", f"Estafa detectada de {remitente}: {r.razon}")
-                cartas_procesadas.append(uid)
-                continue
 
             # ── ¿Aceptación? → responder ──
             if r.es_aceptacion:
@@ -1614,7 +1582,6 @@ class AgenteNegociador:
             table.add_row("📋 Aún falta", str(estado["necesidades"]))
 
         table.add_row("🔄 Intercambios", str(len(self.intercambios_realizados)))
-        table.add_row("🛡️ Lista negra", str(len(self.lista_negra)))
 
         console.print()
         console.print(table)
@@ -1624,11 +1591,6 @@ class AgenteNegociador:
             console.print("\n[bold]Intercambios realizados:[/]")
             for i in self.intercambios_realizados:
                 console.print(f"   → {i['destinatario']}: {i['recursos']}")
-
-        if self.lista_negra:
-            console.print("\n[bold]Lista negra:[/]")
-            for p in self.lista_negra:
-                console.print(f"   ⚠️  {p}")
 
     def ver_log(self, ultimos: int = 20):
         """Muestra las últimas entradas del log (compatibilidad)."""

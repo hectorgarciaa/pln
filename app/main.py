@@ -158,21 +158,14 @@ def _ejecutar_agente(alias: str, modelo: str, debug: bool,
     while True:
         console.rule("[bold]📜 Opciones post-ejecución[/bold]")
         console.print("[bold]1.[/] Ver log (loguru)")
-        console.print("[bold]2.[/] Ver lista negra")
-        console.print("[bold]3.[/] Continuar ejecución")
+        console.print("[bold]2.[/] Continuar ejecución")
         console.print("[bold]0.[/] Salir")
 
-        opcion = Prompt.ask("Opción", choices=["0", "1", "2", "3"], default="0")
+        opcion = Prompt.ask("Opción", choices=["0", "1", "2"], default="0")
 
         if opcion == "1":
             agente.ver_log()
         elif opcion == "2":
-            if agente.lista_negra:
-                for p in agente.lista_negra:
-                    console.print(f"  ⚠️  {p}")
-            else:
-                console.print("  [dim](vacía)[/]")
-        elif opcion == "3":
             rondas = IntPrompt.ask("Rondas adicionales", default=5)
             try:
                 agente.ejecutar(rondas)
