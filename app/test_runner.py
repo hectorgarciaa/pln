@@ -40,8 +40,14 @@ MAIN_SCRIPT = Path(__file__).resolve().parent / "main.py"
 
 # Estilos rich para cada bot (se repiten si hay más de 8)
 ESTILOS = [
-    "green", "blue", "yellow", "magenta",
-    "cyan", "red", "bright_white", "dark_orange",
+    "green",
+    "blue",
+    "yellow",
+    "magenta",
+    "cyan",
+    "red",
+    "bright_white",
+    "dark_orange",
 ]
 
 console = Console()
@@ -49,23 +55,31 @@ console = Console()
 
 # ── Utilidades ───────────────────────────────────────────────────────────
 
-def construir_comando(alias: str, modelo: str, max_rondas: int,
-                      pausa: int, debug: bool) -> list[str]:
+
+def construir_comando(
+    alias: str, modelo: str, max_rondas: int, pausa: int, debug: bool
+) -> list[str]:
     """Construye la lista de argumentos para lanzar un bot."""
     cmd = [
-        sys.executable, str(MAIN_SCRIPT),
-        "--alias", alias,
-        "--modelo", modelo,
-        "--max-rondas", str(max_rondas),
-        "--pausa", str(pausa),
+        sys.executable,
+        str(MAIN_SCRIPT),
+        "--alias",
+        alias,
+        "--modelo",
+        modelo,
+        "--max-rondas",
+        str(max_rondas),
+        "--pausa",
+        str(pausa),
     ]
     if debug:
         cmd.append("--debug")
     return cmd
 
 
-def lanzar_modo_logs(aliases: list[str], modelo: str, max_rondas: int,
-                     pausa: int, debug: bool):
+def lanzar_modo_logs(
+    aliases: list[str], modelo: str, max_rondas: int, pausa: int, debug: bool
+):
     """Lanza bots redirigiendo salida a archivos de log."""
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -94,8 +108,9 @@ def lanzar_modo_logs(aliases: list[str], modelo: str, max_rondas: int,
     return procesos
 
 
-def lanzar_modo_consola(aliases: list[str], modelo: str, max_rondas: int,
-                        pausa: int, debug: bool):
+def lanzar_modo_consola(
+    aliases: list[str], modelo: str, max_rondas: int, pausa: int, debug: bool
+):
     """Lanza bots con salida coloreada en terminal (usa rich)."""
     procesos: list[tuple[str, subprocess.Popen, None]] = []
     hilos: list[threading.Thread] = []
@@ -130,7 +145,9 @@ def lanzar_modo_consola(aliases: list[str], modelo: str, max_rondas: int,
         procesos.append((alias, proc, None))
         console.print(f"  [{estilo}]✅ {alias}[/{estilo}]  (PID {proc.pid})")
 
-        t = threading.Thread(target=lector, args=(alias, proc.stdout, estilo), daemon=True)
+        t = threading.Thread(
+            target=lector, args=(alias, proc.stdout, estilo), daemon=True
+        )
         t.start()
         hilos.append(t)
 
@@ -196,35 +213,67 @@ def _tabla_resumen(procesos: list) -> Table:
 # CLI  (click)
 # =========================================================================
 
+
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
-@click.option("-n", "num_bots", default=DEFAULT_N, show_default=True,
-              help="Número de bots a lanzar.")
-@click.option("--prefijo", default=DEFAULT_PREFIJO, show_default=True,
-              help="Prefijo para los nombres de los bots.")
-@click.option("-m", "--modelo", default=DEFAULT_MODELO, show_default=True,
-              help="Modelo de IA.")
-@click.option("-d", "--debug/--no-debug", default=True, show_default=True,
-              help="Activar/desactivar modo debug.")
-@click.option("-r", "--max-rondas", default=DEFAULT_MAX_RONDAS, show_default=True,
-              help="Rondas máximas por bot.")
-@click.option("-p", "--pausa", default=DEFAULT_PAUSA, show_default=True,
-              help="Pausa entre rondas (segundos).")
-@click.option("--consola", is_flag=True, default=False,
-              help="Mostrar salida coloreada en terminal en vez de logs a archivos.")
+@click.option(
+    "-n",
+    "num_bots",
+    default=DEFAULT_N,
+    show_default=True,
+    help="Número de bots a lanzar.",
+)
+@click.option(
+    "--prefijo",
+    default=DEFAULT_PREFIJO,
+    show_default=True,
+    help="Prefijo para los nombres de los bots.",
+)
+@click.option(
+    "-m", "--modelo", default=DEFAULT_MODELO, show_default=True, help="Modelo de IA."
+)
+@click.option(
+    "-d",
+    "--debug/--no-debug",
+    default=True,
+    show_default=True,
+    help="Activar/desactivar modo debug.",
+)
+@click.option(
+    "-r",
+    "--max-rondas",
+    default=DEFAULT_MAX_RONDAS,
+    show_default=True,
+    help="Rondas máximas por bot.",
+)
+@click.option(
+    "-p",
+    "--pausa",
+    default=DEFAULT_PAUSA,
+    show_default=True,
+    help="Pausa entre rondas (segundos).",
+)
+@click.option(
+    "--consola",
+    is_flag=True,
+    default=False,
+    help="Mostrar salida coloreada en terminal en vez de logs a archivos.",
+)
 def main(num_bots, prefijo, modelo, debug, max_rondas, pausa, consola):
     """🚀 Orquestador de bots negociadores — lanza N bots en paralelo."""
     aliases = [f"{prefijo}_{i}" for i in range(1, num_bots + 1)]
 
-    console.print(Panel.fit(
-        f"[bold]🚀 ORQUESTADOR DE BOTS NEGOCIADORES[/bold]\n\n"
-        f"  Bots:       [cyan]{num_bots}[/]  ({', '.join(aliases)})\n"
-        f"  Modelo:     [cyan]{modelo}[/]\n"
-        f"  Debug:      [{'green' if debug else 'dim'}]{'SÍ' if debug else 'NO'}[/]\n"
-        f"  Max rondas: [cyan]{max_rondas}[/]\n"
-        f"  Pausa:      [cyan]{pausa}s[/]\n"
-        f"  Salida:     [cyan]{'consola' if consola else f'archivos en {LOGS_DIR}/'}[/]",
-        border_style="bright_blue",
-    ))
+    console.print(
+        Panel.fit(
+            f"[bold]🚀 ORQUESTADOR DE BOTS NEGOCIADORES[/bold]\n\n"
+            f"  Bots:       [cyan]{num_bots}[/]  ({', '.join(aliases)})\n"
+            f"  Modelo:     [cyan]{modelo}[/]\n"
+            f"  Debug:      [{'green' if debug else 'dim'}]{'SÍ' if debug else 'NO'}[/]\n"
+            f"  Max rondas: [cyan]{max_rondas}[/]\n"
+            f"  Pausa:      [cyan]{pausa}s[/]\n"
+            f"  Salida:     [cyan]{'consola' if consola else f'archivos en {LOGS_DIR}/'}[/]",
+            border_style="bright_blue",
+        )
+    )
 
     console.print("\n[bold]🔧 Lanzando bots…[/]\n")
 

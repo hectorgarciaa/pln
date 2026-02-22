@@ -52,8 +52,9 @@ class OllamaClient:
 
     # ── API pública ──────────────────────────────────────────────────────
 
-    def consultar(self, prompt: str, timeout: int = 60,
-                  mostrar_progreso: bool = True) -> str:
+    def consultar(
+        self, prompt: str, timeout: int = 60, mostrar_progreso: bool = True
+    ) -> str:
         """
         Envía un prompt a Ollama y devuelve la respuesta limpia.
 
@@ -177,8 +178,10 @@ class OllamaClient:
             if dentro_de_think and think_inicio:
                 if time.time() - think_inicio > THINK_TIMEOUT:
                     pensamiento_cortado = True
-                    logger.debug("✂ Think cortado en _consultar_simple ({}s)",
-                                 time.time() - think_inicio)
+                    logger.debug(
+                        "✂ Think cortado en _consultar_simple ({}s)",
+                        time.time() - think_inicio,
+                    )
                     break
 
             if chunk.get("done"):

@@ -61,8 +61,15 @@ class APIClient:
                         resultado.append(item)
                     elif isinstance(item, dict):
                         # Intentar extraer el nombre del dict
-                        nombre = item.get("nombre") or item.get("name") or item.get("alias") or str(item)
-                        logger.debug("get_gente: item dict normalizado {} -> {}", item, nombre)
+                        nombre = (
+                            item.get("nombre")
+                            or item.get("name")
+                            or item.get("alias")
+                            or str(item)
+                        )
+                        logger.debug(
+                            "get_gente: item dict normalizado {} -> {}", item, nombre
+                        )
                         resultado.append(nombre)
                     else:
                         resultado.append(str(item))
@@ -113,8 +120,14 @@ class APIClient:
     # CARTAS
     # =====================================================================
 
-    def enviar_carta(self, remitente: str, destinatario: str,
-                     asunto: str, cuerpo: str, id_carta: str = None) -> bool:
+    def enviar_carta(
+        self,
+        remitente: str,
+        destinatario: str,
+        asunto: str,
+        cuerpo: str,
+        id_carta: str = None,
+    ) -> bool:
         """Envía una carta a otro jugador."""
         carta_data = {
             "remi": remitente,
@@ -173,7 +186,11 @@ class APIClient:
             elif response.status_code == 422:
                 logger.warning("Error de validación: {}", response.json())
             else:
-                logger.warning("Error enviando paquete: {} - {}", response.status_code, response.text)
+                logger.warning(
+                    "Error enviando paquete: {} - {}",
+                    response.status_code,
+                    response.text,
+                )
             return False
         except requests.RequestException as e:
             logger.error("Error de conexión (enviar paquete): {}", e)

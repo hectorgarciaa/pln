@@ -20,6 +20,7 @@ def _default_butler_address() -> str:
 
 class OllamaParams(BaseModel):
     """Parámetros de generación para Ollama."""
+
     temperature: float = 0.3
     top_p: float = 0.7
     top_k: int = 20
@@ -40,28 +41,50 @@ class Settings(BaseModel):
 
     # ── Modelos de IA ────────────────────────────────────────────────────
     modelos_disponibles: Dict[str, Tuple[str, str]] = {
-        "1": ("llama3.2:3b", "⚡⚡⚡ ULTRA RÁPIDO (3-5s)"),
-        "2": ("qwen3-vl:8b", "⚡⚡ Balance (5-10s)"),
-        "3": ("qwen2.5:7b", "⚡ Calidad (10-15s)"),
-        "4": ("phi3:mini", "⚡⚡⚡ Muy rápido (3-5s)"),
-        "5": ("qwen3:8b", "solo Texto"),
+        "1": ("llama3.2:3b", "ULTRA RÁPIDO (3-5s)"),
+        "2": ("qwen3:8b", "Balanceado (5-10s)"),
     }
     modelo_default: str = "qwen3:8b"
 
     # ── Parámetros de Ollama ─────────────────────────────────────────────
     ollama_params: OllamaParams = OllamaParams()
 
-    # ── Control de pensamiento (modelos qwen3) ───────────────────────────
+    # ── Control de pensamiento (modelo qwen3) ───────────────────────────
     think_timeout: int = Field(default=25, description="Máx. segundos de <think>")
     disable_think: bool = Field(default=False, description="Forzar /no_think")
 
     # ── Recursos conocidos en el juego ───────────────────────────────────
     recursos_conocidos: List[str] = [
-        "oro", "madera", "piedra", "comida", "hierro", "trigo",
-        "carbon", "agua", "plata", "cobre", "diamante", "lana",
-        "tela", "cuero", "cristal", "acero", "ladrillos", "arroz",
-        "queso", "pan", "leche", "carne", "pescado", "fruta",
-        "verdura", "sal", "azucar", "miel", "vino", "cerveza",
+        "oro",
+        "madera",
+        "piedra",
+        "comida",
+        "hierro",
+        "trigo",
+        "carbon",
+        "agua",
+        "plata",
+        "cobre",
+        "diamante",
+        "lana",
+        "tela",
+        "cuero",
+        "cristal",
+        "acero",
+        "ladrillos",
+        "arroz",
+        "queso",
+        "pan",
+        "leche",
+        "carne",
+        "pescado",
+        "fruta",
+        "verdura",
+        "sal",
+        "azucar",
+        "miel",
+        "vino",
+        "cerveza",
     ]
 
 
