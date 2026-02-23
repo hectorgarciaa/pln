@@ -1,4 +1,4 @@
-"""Entry point de compatibilidad para el orquestador de bots."""
+"""Punto de entrada en español para lanzar varios bots en paralelo."""
 
 from pln_bot.interfaz.orquestador_bots import main
 

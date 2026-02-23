@@ -18,7 +18,12 @@ from loguru import logger
 from rich.console import Console
 from rich.status import Status
 
-from ..core.config import OLLAMA_URL, OLLAMA_PARAMS, THINK_TIMEOUT, DISABLE_THINK
+from ..nucleo.configuracion import (
+    OLLAMA_URL,
+    OLLAMA_PARAMS,
+    THINK_TIMEOUT,
+    DISABLE_THINK,
+)
 
 # ── Rich console (reutilizada en toda la app) ───────────────────────────
 console = Console()

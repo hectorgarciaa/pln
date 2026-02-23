@@ -1,4 +1,4 @@
-"""Entry point de compatibilidad para la CLI principal."""
+"""Punto de entrada principal en español para la CLI del bot."""
 
 from pln_bot.interfaz.principal import main
 
