@@ -2,7 +2,7 @@
 Servicio de análisis de mensajes de negociación usando salida estructurada.
 """
 
-from typing import Dict
+from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -61,6 +61,8 @@ class AnalisisMensajesService:
                 '   - "ofrecen" = lo que el remitente ofrece DAR (lo que yo recibiría).\n'
                 '   - "piden" = lo que el remitente quiere RECIBIR (lo que yo daría).\n'
                 "   - Solo recursos y cantidades EXPLÍCITOS. NO inventes.\n"
+                "   - Si hay ambigüedad o falta cantidad explícita, omítelo.\n"
+                "   - Normaliza recursos en minúsculas y sin espacios extra.\n"
                 "   - Rechazo, saludo o no-propuesta → ofrecen={}, piden={}.\n\n"
                 "3) razon: explicación breve de tu análisis.\n\n"
                 'Ejemplo: "yo te doy 2 madera y tú me das 3 piedra"\n'
@@ -71,6 +73,32 @@ class AnalisisMensajesService:
             retries=2,
         )
 
-    def analizar(self, remitente: str, mensaje: str) -> RespuestaUnificada:
-        result = self._agente.run_sync(f'Mensaje de "{remitente}":\n{mensaje}')
+    @staticmethod
+    def _resumen_contexto(recursos: Optional[Dict[str, int]], limite: int = 8) -> str:
+        if not recursos:
+            return "ninguno"
+        items = sorted(recursos.items(), key=lambda kv: (-kv[1], kv[0]))[:limite]
+        return ", ".join(f"{rec}:{cant}" for rec, cant in items)
+
+    def analizar(
+        self,
+        remitente: str,
+        mensaje: str,
+        asunto: str = "",
+        necesidades: Optional[Dict[str, int]] = None,
+        excedentes: Optional[Dict[str, int]] = None,
+        modo_agente: str = "",
+    ) -> RespuestaUnificada:
+        prompt_usuario = (
+            "Analiza este mensaje y produce salida estructurada.\n\n"
+            f"REMITENTE: {remitente}\n"
+            f"ASUNTO: {asunto or '(sin asunto)'}\n"
+            f"MODO_AGENTE: {modo_agente or '(desconocido)'}\n"
+            f"NECESIDADES_PRINCIPALES: {self._resumen_contexto(necesidades)}\n"
+            f"EXCEDENTES_PRINCIPALES: {self._resumen_contexto(excedentes)}\n\n"
+            "MENSAJE:\n"
+            f"{mensaje}\n\n"
+            "Recuerda: no inventes cantidades ni recursos."
+        )
+        result = self._agente.run_sync(prompt_usuario)
         return result.output

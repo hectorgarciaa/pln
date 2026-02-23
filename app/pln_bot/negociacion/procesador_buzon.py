@@ -135,7 +135,13 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
             continue
 
         # ── Análisis unificado (1 sola llamada IA) ──
-        r = agente._analizar_mensaje(remitente, mensaje)
+        r = agente._analizar_mensaje(
+            remitente=remitente,
+            mensaje=mensaje,
+            asunto=asunto,
+            necesidades=necesidades,
+            excedentes=excedentes,
+        )
 
         # ── ¿Aceptación? → responder ──
         if r.es_aceptacion:

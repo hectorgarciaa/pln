@@ -7,7 +7,7 @@ Usa loguru para logging en vez de print().
 
 import time
 import requests
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
 from ..core.config import API_BASE_URL
@@ -70,6 +70,19 @@ class APIClient:
         logger.error("HTTP {} {} falló definitivamente: {}", method, path, ultimo_error)
         return None
 
+    @staticmethod
+    def _safe_json(response: requests.Response) -> Optional[Any]:
+        """Intenta decodificar JSON sin lanzar excepciones."""
+        try:
+            return response.json()
+        except ValueError:
+            logger.warning(
+                "Respuesta no es JSON válido (status {}): {}",
+                response.status_code,
+                response.text[:200],
+            )
+            return None
+
     # =====================================================================
     # INFORMACIÓN
     # =====================================================================
@@ -80,7 +93,8 @@ class APIClient:
         if response is None:
             return None
         if response.status_code == 200:
-            return response.json()
+            data = self._safe_json(response)
+            return data if isinstance(data, dict) else None
         logger.warning("Error obteniendo info: status {}", response.status_code)
         return None
 
@@ -90,7 +104,10 @@ class APIClient:
         if response is None:
             return []
         if response.status_code == 200:
-            data = response.json()
+            data = self._safe_json(response)
+            if not isinstance(data, list):
+                logger.warning("get_gente devolvió payload no-lista: {}", type(data))
+                return []
             # Normalizar: la API puede devolver ["str"] o [{"nombre": ...}]
             resultado = []
             for item in data:
@@ -220,7 +237,8 @@ class APIClient:
         if response.status_code == 200:
             return True
         if response.status_code == 422:
-            logger.warning("Error de validación: {}", response.json())
+            detalle = self._safe_json(response)
+            logger.warning("Error de validación: {}", detalle or response.text)
         else:
             logger.warning(
                 "Error enviando paquete: {} - {}",

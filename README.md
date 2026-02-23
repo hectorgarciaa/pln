@@ -70,6 +70,12 @@ app/
 5. Construye/envía propuestas con `negociacion/constructor_propuestas.py` y `negociacion/enviador_propuestas.py`.
 6. Analiza lenguaje natural con `services/analysis.py` (Ollama).
 
+## Estrategia IA (clásica + moderna)
+- IA clásica: filtros rápidos por regex para sistema/rechazos/aceptaciones en `negociacion/utilidades_mensajes.py`.
+- IA moderna: análisis estructurado con salida tipada (`RespuestaUnificada`) en `services/analysis.py`.
+- Prompt adaptativo: el análisis incluye asunto, modo del agente, necesidades y excedentes para contextualizar cada carta.
+- Control de coste/riesgo: solo se llama al LLM cuando los filtros clásicos no bastan.
+
 ## Configuración
 Archivo central:
 - `app/pln_bot/core/config.py`

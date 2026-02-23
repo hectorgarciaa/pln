@@ -115,6 +115,7 @@ class AgenteNegociador:
         self.pausa_entre_acciones = 1
         self.pausa_entre_rondas = 30
         self.max_rondas = 10
+        self.max_propuestas_por_ronda = 3
 
         # ── Configurar loguru ────────────────────────────────────────────
         # Limpiar handlers previos (evitar duplicados en multi-bot)
@@ -250,14 +251,28 @@ class AgenteNegociador:
     # ANÁLISIS DE MENSAJES (IA + pydantic)
     # =====================================================================
 
-    def _analizar_mensaje(self, remitente: str, mensaje: str) -> RespuestaUnificada:
+    def _analizar_mensaje(
+        self,
+        remitente: str,
+        mensaje: str,
+        asunto: str = "",
+        necesidades: Optional[Dict[str, int]] = None,
+        excedentes: Optional[Dict[str, int]] = None,
+    ) -> RespuestaUnificada:
         """Analiza un mensaje con UNA sola llamada IA (aceptación + extracción).
 
         Devuelve RespuestaUnificada con todos los campos.
         La decisión de aceptar se toma programáticamente después.
         """
         try:
-            r = self.analisis_mensajes.analizar(remitente, mensaje)
+            r = self.analisis_mensajes.analizar(
+                remitente=remitente,
+                mensaje=mensaje,
+                asunto=asunto,
+                necesidades=necesidades,
+                excedentes=excedentes,
+                modo_agente=self.modo.value,
+            )
             self._log("DEBUG", f"IA unificada: {r.model_dump()}")
             return r
         except Exception as e:

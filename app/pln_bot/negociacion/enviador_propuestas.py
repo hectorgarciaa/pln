@@ -10,9 +10,11 @@ from .constructor_propuestas import generar_propuesta
 
 
 def enviar_propuestas(agente, necesidades: Dict, excedentes: Dict, oro: int):
-    """Envía propuestas a jugadores no contactados (máx 3/ronda)."""
+    """Envía propuestas a jugadores no contactados (máx configurable/ronda)."""
     jugadores = agente._obtener_jugadores_disponibles()
     jugadores = [j for j in jugadores if j not in agente.contactados_esta_ronda]
+    max_envios = max(1, int(getattr(agente, "max_propuestas_por_ronda", 3)))
+    envios_realizados = 0
 
     if not jugadores:
         agente._log("INFO", "No hay jugadores a quienes enviar propuestas esta ronda")
@@ -47,5 +49,12 @@ def enviar_propuestas(agente, necesidades: Dict, excedentes: Dict, oro: int):
                 f"dar={propuesta['_ofrezco']}, pedir={propuesta['_pido']} "
                 f"[tx:{propuesta.get('_tx_id')}]",
             )
+            envios_realizados += 1
+            if envios_realizados >= max_envios:
+                agente._log(
+                    "INFO",
+                    f"Límite de propuestas por ronda alcanzado ({max_envios})",
+                )
+                break
 
         time.sleep(agente.pausa_entre_acciones)

@@ -16,7 +16,6 @@ import time
 import ollama
 from loguru import logger
 from rich.console import Console
-from rich.status import Status
 
 from ..core.config import OLLAMA_URL, OLLAMA_PARAMS, THINK_TIMEOUT, DISABLE_THINK
 
