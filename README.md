@@ -46,8 +46,8 @@ app/
 └── pln_bot/
     ├── agente/
     │   ├── negociador.py
-    │   └── ejecutor_ronda.py
-    ├── nucleo/
+    │   └── ronda.py
+    ├── core/
     │   └── config.py
     ├── negociacion/
     │   ├── gestor_acuerdos.py
@@ -56,23 +56,23 @@ app/
     │   ├── politica_negociacion.py
     │   ├── constructor_propuestas.py
     │   └── enviador_propuestas.py
-    └── servicios/
+    └── services/
         ├── api_client.py
         ├── ollama_client.py
-        └── servicio_analisis.py
+        └── analysis.py
 ```
 
 ## Flujo de datos
 1. `main.py` crea `AgenteNegociador`.
-2. El agente consulta estado con `servicios/api_client.py`.
+2. El agente consulta estado con `services/api_client.py`.
 3. Procesa cartas con `negociacion/procesador_buzon.py`.
 4. Decide con `negociacion/politica_negociacion.py`.
 5. Construye/envía propuestas con `negociacion/constructor_propuestas.py` y `negociacion/enviador_propuestas.py`.
-6. Analiza lenguaje natural con `servicios/servicio_analisis.py` (Ollama).
+6. Analiza lenguaje natural con `services/analysis.py` (Ollama).
 
 ## Configuración
 Archivo central:
-- `app/pln_bot/nucleo/config.py`
+- `app/pln_bot/core/config.py`
 
 Variables clave:
 - `FDI_PLN__BUTLER_ADDRESS`

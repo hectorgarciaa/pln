@@ -19,8 +19,8 @@ from rich.prompt import Prompt, IntPrompt, Confirm
 from rich.table import Table
 
 from pln_bot.agente.negociador import AgenteNegociador
-from pln_bot.servicios.api_client import APIClient
-from pln_bot.nucleo.config import MODELOS_DISPONIBLES, MODELO_DEFAULT
+from pln_bot.services.api_client import APIClient
+from pln_bot.core.config import MODELOS_DISPONIBLES, MODELO_DEFAULT
 
 console = Console()
 
