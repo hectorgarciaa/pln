@@ -281,11 +281,9 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
             agente._log("DECISION", f"RECHAZO oferta de {remitente} ({razon})")
             # Registrar el rechazo que NOSOTROS hacemos para no repetir
             registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
-            agente._enviar_carta(
-                remitente,
-                f"Re: {asunto}",
-                f"Gracias por la oferta, {remitente}, pero por ahora "
-                f"no me conviene ese intercambio. Saludos, {agente.alias}",
+            agente._log(
+                "INFO",
+                f"Oferta de {remitente} no interesante: no se envía respuesta directa",
             )
         else:
             agente._log("INFO", f"Mensaje de {remitente} sin propuesta clara: {razon}")
