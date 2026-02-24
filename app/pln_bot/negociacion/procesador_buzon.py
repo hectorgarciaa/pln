@@ -155,6 +155,17 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
         aceptar, razon = decidir_aceptar_programatico(
             r.ofrecen, r.piden, necesidades, excedentes
         )
+        aceptacion_rescate = False
+        if not aceptar:
+            aceptacion_rescate, razon_rescate = agente._decidir_aceptar_rescate(
+                r.ofrecen,
+                r.piden,
+                necesidades,
+                excedentes,
+            )
+            if aceptacion_rescate:
+                aceptar = True
+                razon = razon_rescate
 
         agente._log(
             "ANALISIS",
@@ -169,6 +180,11 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
 
         # ── Decisión: aceptar ──
         if aceptar and r.piden:
+            if aceptacion_rescate:
+                agente._log(
+                    "DECISION",
+                    f"Modo rescate activado con {remitente}: {razon}",
+                )
             # VALIDAR antes de enviar: ¿me piden cosas que realmente me sobran?
             estado_fresco = agente._actualizar_estado()
             mis_recursos = (
@@ -207,6 +223,8 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
                     f"🤝 ACEPTO oferta de {remitente}: doy {enviado_str} por {ofrecen_str}",
                 )
                 if agente._enviar_paquete(remitente, recursos_a_enviar):
+                    if aceptacion_rescate:
+                        agente.aceptaciones_rescate_esta_ronda += 1
                     agente._enviar_carta(
                         remitente,
                         f"Re: {asunto}",

@@ -14,6 +14,7 @@ def ejecutar_ronda(agente, console) -> bool:
     console.rule(f"[bold]📍 RONDA — Modo: {agente.modo.value}[/bold]")
 
     agente.ronda_actual += 1
+    agente.aceptaciones_rescate_esta_ronda = 0
     inicio_ronda = time.time()
 
     # Evita bloquear recursos durante demasiadas rondas por acuerdos sin respuesta.

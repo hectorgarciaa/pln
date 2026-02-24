@@ -104,6 +104,12 @@ class AgenteNegociador:
         # Expiran tras RECHAZO_TTL rondas para reintentar con nuevas condiciones
         self.rechazos_recibidos: Dict[tuple, int] = {}
         self.RECHAZO_TTL: int = 2  # rondas antes de reintentar un combo rechazado
+        # Modo rescate: si hay muchos rechazos sobre recursos objetivo, aceptar
+        # alguna oferta menos óptima para desbloquear cadena de intercambios.
+        self.UMBRAL_RECHAZOS_RESCATE: int = 3
+        self.MAX_ACEPTACIONES_RESCATE_POR_RONDA: int = 1
+        self.MAX_STOCK_RESCATE_POR_RECURSO: int = 3
+        self.aceptaciones_rescate_esta_ronda: int = 0
         # Ventanas de tiempo para gestión robusta de acuerdos.
         self.ACUERDO_TTL_SEGUNDOS: int = 300
         self.ACUERDO_GRACIA_TTL_SEGUNDOS: int = 240
@@ -424,6 +430,75 @@ class AgenteNegociador:
             return False
         ronda_rechazo = self.rechazos_recibidos[clave]
         return (self.ronda_actual - ronda_rechazo) < self.RECHAZO_TTL
+
+    def _presion_rechazos_necesidades(self, necesidades: Dict[str, int]) -> Dict[str, int]:
+        """Cuenta rechazos recientes por recurso que necesitamos."""
+        presion = {recurso: 0 for recurso in necesidades}
+        if not presion:
+            return presion
+
+        for (_destinatario, _ofrezco, pido), ronda_rechazo in self.rechazos_recibidos.items():
+            if pido not in presion:
+                continue
+            if (self.ronda_actual - ronda_rechazo) < self.RECHAZO_TTL:
+                presion[pido] += 1
+        return presion
+
+    def _decidir_aceptar_rescate(
+        self,
+        ofrecen: Dict[str, int],
+        piden: Dict[str, int],
+        necesidades: Dict[str, int],
+        excedentes: Dict[str, int],
+    ) -> tuple[bool, str]:
+        """Acepta ofertas subóptimas cuando hay bloqueo por rechazos repetidos."""
+        if self.modo != ModoAgente.CONSEGUIR_OBJETIVO:
+            return False, "rescate desactivado fuera de modo objetivo"
+        if self.aceptaciones_rescate_esta_ronda >= self.MAX_ACEPTACIONES_RESCATE_POR_RONDA:
+            return False, "rescate agotado en esta ronda"
+        if not ofrecen or not piden or not necesidades:
+            return False, "rescate no aplica (oferta/necesidades incompletas)"
+
+        presion = self._presion_rechazos_necesidades(necesidades)
+        material_bloqueado = None
+        rechazos_material = 0
+        if presion:
+            material_bloqueado = max(presion, key=presion.get)
+            rechazos_material = presion.get(material_bloqueado, 0)
+        if rechazos_material < self.UMBRAL_RECHAZOS_RESCATE:
+            return False, "sin bloqueo suficiente por rechazos"
+
+        piden_solo_excedentes = all(
+            r in excedentes and excedentes[r] >= c for r, c in piden.items() if c > 0
+        )
+        if not piden_solo_excedentes:
+            return False, "rescate no seguro: piden recursos no excedentarios"
+
+        # Si ofrecen objetivo u oro, ya lo cubre la política normal.
+        if any(r in necesidades for r in ofrecen):
+            return False, "rescate no necesario: ofrecen recurso objetivo"
+        if "oro" in ofrecen and ofrecen.get("oro", 0) > 0:
+            return False, "rescate no necesario: ofrecen oro"
+
+        recursos = self.info_actual.get("Recursos", {}) if self.info_actual else {}
+        oferta_util_para_cadena = False
+        for recurso, cantidad in ofrecen.items():
+            if cantidad <= 0:
+                continue
+            if recurso == "oro":
+                oferta_util_para_cadena = True
+                break
+            if recursos.get(recurso, 0) < self.MAX_STOCK_RESCATE_POR_RECURSO:
+                oferta_util_para_cadena = True
+                break
+        if not oferta_util_para_cadena:
+            return False, "rescate descartado por sobrestock"
+
+        return (
+            True,
+            f"aceptacion_rescate por bloqueo en '{material_bloqueado}' "
+            f"({rechazos_material} rechazos recientes)",
+        )
 
     def _generar_texto_propuesta_ia(
         self, destinatario: str, necesidades: Dict, excedentes: Dict, oro: int
