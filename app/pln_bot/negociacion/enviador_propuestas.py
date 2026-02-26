@@ -15,12 +15,28 @@ def enviar_propuestas(agente, necesidades: Dict, excedentes: Dict, oro: int):
     jugadores = [j for j in jugadores if j not in agente.contactados_esta_ronda]
     max_envios = max(1, int(getattr(agente, "max_propuestas_por_ronda", 3)))
     envios_realizados = 0
+    ahora = time.time()
 
     if not jugadores:
         agente._log("INFO", "No hay jugadores a quienes enviar propuestas esta ronda")
         return
 
     for jugador in jugadores:
+        if agente.acuerdos_pendientes.get(jugador):
+            agente._log(
+                "INFO",
+                f"Saltando {jugador}: ya hay acuerdo(s) pendiente(s) con ese jugador",
+            )
+            continue
+
+        en_cooldown, restante = agente._en_cooldown_contacto(jugador, ahora=ahora)
+        if en_cooldown:
+            agente._log(
+                "INFO",
+                f"Saltando {jugador}: cooldown de contacto activo ({restante}s)",
+            )
+            continue
+
         propuesta = generar_propuesta(agente, jugador, necesidades, excedentes, oro)
         if propuesta is None:
             agente._log("INFO", f"No se generó propuesta para {jugador}")
