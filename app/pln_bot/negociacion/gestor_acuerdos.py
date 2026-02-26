@@ -161,8 +161,15 @@ def responder_aceptacion(
                 acuerdo_idx = 0
                 origen_acuerdo = "pendiente"
             if acuerdo is None and len(acuerdos) > 1:
+                recursos_candidatos = set()
+                for ac in acuerdos:
+                    recursos_candidatos.update(ac.get("recursos_dar", {}).keys())
+                    recursos_candidatos.update(ac.get("recursos_pedir", {}).keys())
+
                 recursos_mencionados = set(
-                    extraer_recursos_mencionados(mensaje_original)
+                    extraer_recursos_mencionados(
+                        mensaje_original, candidatos=recursos_candidatos
+                    )
                 )
                 candidatos = []
                 for i, ac in enumerate(acuerdos):

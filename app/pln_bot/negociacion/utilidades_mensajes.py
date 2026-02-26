@@ -3,9 +3,7 @@ Utilidades de parsing y clasificación de mensajes de negociación.
 """
 
 import re as _re
-from typing import Dict, List, Optional
-
-from ..core.config import RECURSOS_CONOCIDOS
+from typing import Dict, Iterable, List, Optional
 
 # Detectores de intención en texto libre
 RE_RECHAZO = _re.compile(
@@ -45,16 +43,75 @@ RE_ASUNTO_RECURSOS = _re.compile(
     _re.IGNORECASE,
 )
 RE_RECURSO_INDIVIDUAL = _re.compile(r"(\d+)\s+(\w+)")
+RE_TOKEN = _re.compile(r"\b([a-záéíóúñ][a-z0-9_áéíóúñ-]{1,})\b", _re.IGNORECASE)
 
 
-def extraer_recursos_mencionados(mensaje: str) -> List[str]:
-    """Extrae recursos conocidos mencionados en un mensaje de texto."""
+def extraer_recursos_mencionados(
+    mensaje: str, candidatos: Optional[Iterable[str]] = None
+) -> List[str]:
+    """Extrae recursos mencionados en un mensaje.
+
+    Si se pasan `candidatos`, busca solo esos nombres (ideal para recursos dinámicos
+    conocidos en runtime). Si no, usa heurística ligera basada en patrones del texto.
+    """
     msg_lower = mensaje.lower()
-    encontrados = []
-    for recurso in RECURSOS_CONOCIDOS:
-        if _re.search(r"\b" + _re.escape(recurso) + r"\b", msg_lower):
-            encontrados.append(recurso)
-    return encontrados
+    encontrados: List[str] = []
+
+    if candidatos is not None:
+        candidatos_norm = [
+            str(c).strip().lower() for c in candidatos if str(c).strip()
+        ]
+        for recurso in candidatos_norm:
+            if _re.search(r"\b" + _re.escape(recurso) + r"\b", msg_lower):
+                encontrados.append(recurso)
+        if encontrados:
+            return list(dict.fromkeys(encontrados))
+
+    # Heurística general cuando no hay lista de candidatos:
+    # 1) recursos con cantidad explícita ("2 madera")
+    for _cant, recurso in RE_RECURSO_INDIVIDUAL.findall(msg_lower):
+        recurso_norm = recurso.strip().lower()
+        if recurso_norm:
+            encontrados.append(recurso_norm)
+
+    # 2) recursos tras verbos de intención ("necesito X", "quiero X", "busco X")
+    for m in _re.finditer(r"\b(?:necesito|quiero|busco|pido)\s+(\w+)", msg_lower):
+        recurso_norm = m.group(1).strip().lower()
+        if recurso_norm:
+            encontrados.append(recurso_norm)
+
+    # 3) fallback suave: tokens útiles (evita puntuación/ruido básico)
+    if not encontrados:
+        stopwords = {
+            "hola",
+            "gracias",
+            "oferta",
+            "trato",
+            "acuerdo",
+            "conviene",
+            "saludos",
+            "te",
+            "yo",
+            "tu",
+            "me",
+            "das",
+            "doy",
+            "por",
+            "mi",
+            "si",
+            "no",
+            "el",
+            "la",
+            "de",
+            "un",
+            "una",
+            "que",
+        }
+        for token in RE_TOKEN.findall(msg_lower):
+            if token not in stopwords and len(token) >= 3:
+                encontrados.append(token)
+
+    return list(dict.fromkeys(encontrados))
 
 
 def extraer_tx_id(*textos: str) -> Optional[str]:

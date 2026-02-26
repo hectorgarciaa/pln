@@ -53,7 +53,6 @@ app/
     │   ├── gestor_acuerdos.py
     │   ├── procesador_buzon.py
     │   ├── utilidades_mensajes.py
-    │   ├── politica_negociacion.py
     │   ├── constructor_propuestas.py
     │   └── enviador_propuestas.py
     └── services/
@@ -66,13 +65,14 @@ app/
 1. `main.py` crea `AgenteNegociador`.
 2. El agente consulta estado con `services/api_client.py`.
 3. Procesa cartas con `negociacion/procesador_buzon.py`.
-4. Decide con `negociacion/politica_negociacion.py`.
+4. Decide con LLM + tools en `services/analysis.py`.
 5. Construye/envía propuestas con `negociacion/constructor_propuestas.py` y `negociacion/enviador_propuestas.py`.
-6. Analiza lenguaje natural con `services/analysis.py` (Ollama).
+6. Ejecuta acuerdos pendientes y validaciones de seguridad en `negociacion/gestor_acuerdos.py`.
 
 ## Estrategia IA (clásica + moderna)
 - IA clásica: filtros rápidos por regex para sistema/rechazos/aceptaciones en `negociacion/utilidades_mensajes.py`.
-- IA moderna: análisis estructurado con salida tipada (`RespuestaUnificada`) en `services/analysis.py`.
+- IA moderna: análisis estructurado + decisión con salida tipada (`RespuestaUnificada`) en `services/analysis.py`.
+- Tools del LLM: `consultar_necesidad`, `consultar_excedente`, `consultar_stock`, `consultar_objetivo`, `puedo_entregar`.
 - Prompt adaptativo: el análisis incluye asunto, modo del agente, necesidades y excedentes para contextualizar cada carta.
 - Control de coste/riesgo: solo se llama al LLM cuando los filtros clásicos no bastan.
 

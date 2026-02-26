@@ -7,7 +7,7 @@ Uso interactivo (menú):
     python main.py
 
 Uso automático (lanzar bot directo):
-    python main.py --alias Bot_1 --modelo llama3.2:3b --debug --max-rondas 10
+    python main.py --alias Bot_1 --modelo qwen3:8b --debug --max-rondas 10
 """
 
 import json
@@ -20,7 +20,7 @@ from rich.table import Table
 
 from pln_bot.agente.negociador import AgenteNegociador
 from pln_bot.services.api_client import APIClient
-from pln_bot.core.config import MODELOS_DISPONIBLES, MODELO_DEFAULT
+from pln_bot.core.config import MODELOS_DISPONIBLES, MODELO_DEFAULT, modelo_soporta_tools
 
 console = Console()
 
@@ -68,6 +68,12 @@ console = Console()
 @click.option("--api-url", default=None, help="URL base de la API del juego.")
 def main(alias, modelo, debug, max_rondas, pausa, api_url):
     """🤖 Agente Negociador Autónomo para fdi-pln-butler."""
+    if not modelo_soporta_tools(modelo):
+        console.print(
+            f"[red]❌ Modelo '{modelo}' no soportado.[/] "
+            "Este proyecto usa tools y requiere un modelo qwen*."
+        )
+        return
 
     # ── Modo automático (CLI) ────────────────────────────────────────────
     if alias:
@@ -185,7 +191,11 @@ def _ejecutar_agente(
     api_url: str = None,
 ):
     """Crea y ejecuta el agente negociador."""
-    agente = AgenteNegociador(alias, modelo, debug, api_url=api_url)
+    try:
+        agente = AgenteNegociador(alias, modelo, debug, api_url=api_url)
+    except ValueError as e:
+        console.print(f"[red]❌ {e}[/]")
+        return
     agente.pausa_entre_rondas = pausa
 
     try:

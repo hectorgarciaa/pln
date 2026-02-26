@@ -8,7 +8,7 @@ Usa **click** para la CLI y **rich** para la salida coloreada.
 Uso:
     python test_runner.py                           # 3 bots por defecto
     python test_runner.py -n 5                      # 5 bots
-    python test_runner.py -n 2 -m llama3.2:3b -d    # 2 bots, debug
+    python test_runner.py -n 2 -m qwen3:8b -d       # 2 bots, debug
     python test_runner.py -n 4 --prefijo Agent      # Agent_1 … Agent_4
     python test_runner.py -n 3 --consola            # salida coloreada en terminal
 
@@ -28,6 +28,7 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from pln_bot.core.config import modelo_soporta_tools
 
 # ── Configuración ────────────────────────────────────────────────────────
 DEFAULT_N = 3
@@ -261,6 +262,13 @@ def _tabla_resumen(procesos: list) -> Table:
 )
 def main(num_bots, prefijo, modelo, debug, max_rondas, pausa, consola):
     """🚀 Orquestador de bots negociadores — lanza N bots en paralelo."""
+    if not modelo_soporta_tools(modelo):
+        console.print(
+            f"[red]❌ Modelo '{modelo}' no soportado.[/] "
+            "Este proyecto usa tools y requiere un modelo qwen*."
+        )
+        sys.exit(2)
+
     aliases = [f"{prefijo}_{i}" for i in range(1, num_bots + 1)]
 
     console.print(

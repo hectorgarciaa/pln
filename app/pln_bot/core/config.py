@@ -18,6 +18,11 @@ def _default_butler_address() -> str:
     return "http://127.0.0.1:7719"
 
 
+def modelo_soporta_tools(modelo: str) -> bool:
+    """Valida si el modelo soporta el flujo de tools de negociación."""
+    return modelo.strip().lower().startswith("qwen")
+
+
 class OllamaParams(BaseModel):
     """Parámetros de generación para Ollama."""
 
@@ -41,8 +46,7 @@ class Settings(BaseModel):
 
     # ── Modelos de IA ────────────────────────────────────────────────────
     modelos_disponibles: Dict[str, Tuple[str, str]] = {
-        "1": ("llama3.2:3b", "ULTRA RÁPIDO (3-5s)"),
-        "2": ("qwen3:8b", "Balanceado (5-10s)"),
+        "1": ("qwen3:8b", "QWEN (tools activas)"),
     }
     modelo_default: str = "qwen3:8b"
 
@@ -58,11 +62,33 @@ class Settings(BaseModel):
         "oro",
         "madera",
         "piedra",
+        "comida",
+        "hierro",
         "trigo",
+        "carbon",
+        "agua",
+        "plata",
+        "cobre",
+        "diamante",
+        "lana",
         "tela",
+        "cuero",
+        "cristal",
+        "acero",
         "ladrillos",
         "arroz",
         "queso",
+        "pan",
+        "leche",
+        "carne",
+        "pescado",
+        "fruta",
+        "verdura",
+        "sal",
+        "azucar",
+        "miel",
+        "vino",
+        "cerveza",
     ]
 
 

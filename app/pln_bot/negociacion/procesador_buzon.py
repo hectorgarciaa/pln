@@ -15,8 +15,56 @@ from .utilidades_mensajes import (
     registrar_rechazo,
     registrar_rechazo_propio,
 )
-from .politica_negociacion import decidir_aceptar_programatico
-from .constructor_propuestas import generar_contraoferta, generar_propuesta_adaptada
+from .constructor_propuestas import (
+    generar_propuesta_adaptada,
+    nuevo_tx_id,
+)
+
+
+def _normalizar_recursos(recursos: Dict[str, int]) -> Dict[str, int]:
+    normalizados: Dict[str, int] = {}
+    if not isinstance(recursos, dict):
+        return normalizados
+    for rec, cant in recursos.items():
+        try:
+            cantidad = int(cant)
+        except (TypeError, ValueError):
+            continue
+        if cantidad <= 0:
+            continue
+        normalizados[str(rec).strip().lower()] = cantidad
+    return normalizados
+
+
+def _construir_contraoferta_ia(
+    agente, destinatario: str, ofrezco: Dict[str, int], pido: Dict[str, int]
+) -> dict | None:
+    ofrezco = _normalizar_recursos(ofrezco)
+    pido = _normalizar_recursos(pido)
+    if not ofrezco or not pido:
+        return None
+
+    ofrezco_str = ", ".join(f"{c} {r}" for r, c in ofrezco.items())
+    pido_str = ", ".join(f"{c} {r}" for r, c in pido.items())
+    tx_id = nuevo_tx_id()
+
+    cuerpo = (
+        f"Hola {destinatario}, soy {agente.alias}. "
+        f"[tx:{tx_id}] "
+        f"Te hago una contrapropuesta: "
+        f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
+        f"Si aceptas, responde 'acepto el trato'. "
+        f"Si no te conviene, responde 'no me conviene'. "
+        f"Saludos, {agente.alias}"
+    )
+
+    return {
+        "asunto": f"Contrapropuesta: [tx:{tx_id}] mi {ofrezco_str} por tu {pido_str}",
+        "cuerpo": cuerpo,
+        "_ofrezco": ofrezco,
+        "_pido": pido,
+        "_tx_id": tx_id,
+    }
 
 
 def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
@@ -53,9 +101,11 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
             registrar_rechazo(agente, remitente, asunto)
 
             # Intentar extraer qué recursos quiere el otro jugador
-            recursos_mencionados = extraer_recursos_mencionados(mensaje)
-            # Filtrar: solo los que nosotros tenemos de sobra
             exc_disp = agente._excedentes_disponibles(excedentes)
+            recursos_mencionados = extraer_recursos_mencionados(
+                mensaje, candidatos=exc_disp.keys()
+            )
+            # Filtrar: solo los que nosotros tenemos de sobra
             recursos_que_podemos_dar = [
                 r for r in recursos_mencionados if r in exc_disp and exc_disp[r] > 0
             ]
@@ -135,12 +185,20 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
             continue
 
         # ── Análisis unificado (1 sola llamada IA) ──
+        recursos_actuales = (
+            agente.info_actual.get("Recursos", {}) if agente.info_actual else {}
+        )
+        objetivo_actual = (
+            agente.info_actual.get("Objetivo", {}) if agente.info_actual else {}
+        )
         r = agente._analizar_mensaje(
             remitente=remitente,
             mensaje=mensaje,
             asunto=asunto,
             necesidades=necesidades,
             excedentes=excedentes,
+            recursos_actuales=recursos_actuales,
+            objetivo=objetivo_actual,
         )
 
         # ── ¿Aceptación? → responder ──
@@ -151,21 +209,10 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
             cartas_procesadas.append(uid)
             continue
 
-        # ── Decisión programática sobre la propuesta ──
-        aceptar, razon = decidir_aceptar_programatico(
-            r.ofrecen, r.piden, necesidades, excedentes
-        )
-        aceptacion_rescate = False
-        if not aceptar:
-            aceptacion_rescate, razon_rescate = agente._decidir_aceptar_rescate(
-                r.ofrecen,
-                r.piden,
-                necesidades,
-                excedentes,
-            )
-            if aceptacion_rescate:
-                aceptar = True
-                razon = razon_rescate
+        # ── Decisión guiada por LLM ──
+        razon = r.razon or "sin explicación"
+        hay_oferta = bool(r.ofrecen or r.piden)
+        decision = r.decision if hay_oferta else "ignorar"
 
         agente._log(
             "ANALISIS",
@@ -173,18 +220,15 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
             {
                 "ofrecen": r.ofrecen,
                 "piden": r.piden,
-                "aceptar": aceptar,
+                "decision": decision,
                 "razon": razon,
+                "contraoferta_ofrezco": r.contraoferta_ofrezco,
+                "contraoferta_pido": r.contraoferta_pido,
             },
         )
 
         # ── Decisión: aceptar ──
-        if aceptar and r.piden:
-            if aceptacion_rescate:
-                agente._log(
-                    "DECISION",
-                    f"Modo rescate activado con {remitente}: {razon}",
-                )
+        if decision == "aceptar" and r.piden and r.ofrecen:
             # VALIDAR antes de enviar: ¿me piden cosas que realmente me sobran?
             estado_fresco = agente._actualizar_estado()
             mis_recursos = (
@@ -223,8 +267,6 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
                     f"🤝 ACEPTO oferta de {remitente}: doy {enviado_str} por {ofrecen_str}",
                 )
                 if agente._enviar_paquete(remitente, recursos_a_enviar):
-                    if aceptacion_rescate:
-                        agente.aceptaciones_rescate_esta_ronda += 1
                     agente._enviar_carta(
                         remitente,
                         f"Re: {asunto}",
@@ -241,45 +283,66 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
                     f"Oferta de {remitente} parecía aceptable pero "
                     f"no hay recursos válidos para enviar — rechazada",
                 )
+                registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
             else:
                 agente._log(
                     "DECISION",
                     f"Oferta de {remitente} rechazada: "
                     f"no tengo suficientes excedentes para enviar {r.piden}",
                 )
+                registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
 
-        elif r.ofrecen or r.piden:
-            # ── ¿Contraoferta? Si ofrecen algo que necesito pero piden
-            #    lo que no tengo → intentar contraoferta con mis excedentes
-            me_ofrecen_util = any(rec in necesidades for rec in r.ofrecen)
-            if (
-                me_ofrecen_util
-                and razon == "piden recursos que no me sobran o no tengo suficientes"
-            ):
-                contra = generar_contraoferta(
-                    agente, remitente, r.ofrecen, necesidades, excedentes
+        elif decision == "contraofertar" and hay_oferta:
+            contra = _construir_contraoferta_ia(
+                agente, remitente, r.contraoferta_ofrezco, r.contraoferta_pido
+            )
+            if contra is None:
+                agente._log(
+                    "DECISION",
+                    f"Contraoferta de IA inválida para {remitente} ({razon})",
                 )
-                if contra:
+                registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
+            else:
+                exc_disp = agente._excedentes_disponibles(excedentes)
+                envio_valido = all(
+                    exc_disp.get(rec, 0) >= cant
+                    for rec, cant in contra["_ofrezco"].items()
+                )
+                if not envio_valido:
                     agente._log(
                         "DECISION",
-                        f"CONTRAOFERTA a {remitente}: "
+                        f"Contraoferta de IA rechazada por excedente insuficiente con {remitente}",
+                        {"ofrezco": contra["_ofrezco"], "excedentes": exc_disp},
+                    )
+                    registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
+                else:
+                    agente._log(
+                        "DECISION",
+                        f"CONTRAOFERTA (LLM) a {remitente}: "
                         f"dar={contra['_ofrezco']}, pedir={contra['_pido']} "
                         f"[tx:{contra.get('_tx_id')}]",
                     )
-                    agente._enviar_carta(remitente, contra["asunto"], contra["cuerpo"])
-                    # Registrar acuerdo pendiente
-                    registrar_acuerdo_pendiente(
-                        agente,
-                        remitente,
-                        contra["_ofrezco"],
-                        contra["_pido"],
-                        contra["_tx_id"],
-                    )
-                    cartas_procesadas.append(uid)
-                    continue
+                    if agente._enviar_carta(remitente, contra["asunto"], contra["cuerpo"]):
+                        registrar_acuerdo_pendiente(
+                            agente,
+                            remitente,
+                            contra["_ofrezco"],
+                            contra["_pido"],
+                            contra["_tx_id"],
+                        )
+                        for r_o in contra["_ofrezco"]:
+                            for r_p in contra["_pido"]:
+                                agente.propuestas_enviadas[(remitente, r_o, r_p)] = (
+                                    agente.ronda_actual
+                                )
+                    else:
+                        agente._log(
+                            "ERROR",
+                            f"No se pudo enviar contraoferta a {remitente}",
+                        )
 
+        elif hay_oferta:
             agente._log("DECISION", f"RECHAZO oferta de {remitente} ({razon})")
-            # Registrar el rechazo que NOSOTROS hacemos para no repetir
             registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
             agente._log(
                 "INFO",
