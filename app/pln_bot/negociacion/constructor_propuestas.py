@@ -136,8 +136,9 @@ def generar_propuesta(
         f"[tx:{tx_id}] "
         f"Te propongo un intercambio: "
         f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
-        f"Si aceptas, responde 'acepto el trato'. "
-        f"Si no te conviene, responde 'no me conviene'. "
+        f"Para este trato, usa siempre este id: [tx:{tx_id}]. "
+        f"Si aceptas, responde 'acepto el trato [tx:{tx_id}]'. "
+        f"Si no te conviene, responde 'no me conviene [tx:{tx_id}]'. "
         f"Saludos, {agente.alias}"
     )
 
@@ -204,8 +205,9 @@ def generar_contraoferta(
         f"Vi tu oferta pero no tengo lo que pides. "
         f"Te hago una contrapropuesta: "
         f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
-        f"Si aceptas, responde 'acepto el trato'. "
-        f"Si no te conviene, responde 'no me conviene'. "
+        f"Para este trato, usa siempre este id: [tx:{tx_id}]. "
+        f"Si aceptas, responde 'acepto el trato [tx:{tx_id}]'. "
+        f"Si no te conviene, responde 'no me conviene [tx:{tx_id}]'. "
         f"Saludos, {agente.alias}"
     )
 
@@ -258,8 +260,9 @@ def generar_propuesta_adaptada(
         f"He visto que necesitas {ofrezco_str}. "
         f"Te propongo un intercambio: "
         f"yo te doy {ofrezco_str} y tú me das {pido_str}. "
-        f"Si aceptas, responde 'acepto el trato'. "
-        f"Si no te conviene, responde 'no me conviene'. "
+        f"Para este trato, usa siempre este id: [tx:{tx_id}]. "
+        f"Si aceptas, responde 'acepto el trato [tx:{tx_id}]'. "
+        f"Si no te conviene, responde 'no me conviene [tx:{tx_id}]'. "
         f"Saludos, {agente.alias}"
     )
 

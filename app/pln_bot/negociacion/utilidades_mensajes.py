@@ -31,7 +31,10 @@ RE_RESPUESTA_RECHAZO = _re.compile(
     r"|^\s*Por ahora no.*Saludos",
     _re.IGNORECASE | _re.DOTALL,
 )
-RE_TX_ID = _re.compile(r"\[tx:([a-z0-9_-]{6,64})\]", _re.IGNORECASE)
+RE_TX_ID_TAG = _re.compile(r"\[(?:t?tx):([a-z0-9_-]{6,64})\]", _re.IGNORECASE)
+RE_TX_ID_INLINE = _re.compile(
+    r"\b(?:t?tx)\s*[:=#-]\s*([a-z0-9_-]{6,64})\b", _re.IGNORECASE
+)
 
 # Regex para recursos en asunto de propuestas
 RE_ASUNTO_PROPUESTA = _re.compile(
@@ -113,13 +116,15 @@ def extraer_recursos_mencionados(
 
 
 def extraer_tx_id(*textos: str) -> Optional[str]:
-    """Extrae tx_id de asunto/cuerpo si existe el tag [tx:...]."""
+    """Extrae tx_id/ttx de asunto/cuerpo en formato tag o inline."""
     for texto in textos:
         if not texto:
             continue
-        m = RE_TX_ID.search(texto)
+        m = RE_TX_ID_TAG.search(texto)
+        if not m:
+            m = RE_TX_ID_INLINE.search(texto)
         if m:
-            return m.group(1).lower()
+            return m.group(1).strip().lower()
     return None
 
 
