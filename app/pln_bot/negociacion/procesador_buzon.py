@@ -67,6 +67,17 @@ def _construir_contraoferta_ia(
     }
 
 
+def _enviar_rechazo_no_silencioso(
+    agente, remitente: str, asunto_original: str, razon: str
+) -> None:
+    """Envía rechazo explícito para no dejar ofertas sin respuesta."""
+    tx_id = extraer_tx_id(asunto_original)
+    tx_tag = f" [tx:{tx_id}]" if tx_id else ""
+    asunto = f"Re: {asunto_original}" if asunto_original else "Rechazo de propuesta"
+    cuerpo = f"No me conviene{tx_tag}. Motivo: {razon}. Saludos, {agente.alias}"
+    agente._enviar_carta(remitente, asunto, cuerpo)
+
+
 def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
     """Procesa todas las cartas del buzón usando IA para lenguaje natural."""
     buzon = agente.info_actual.get("Buzon", {}) if agente.info_actual else {}
@@ -336,6 +347,12 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
                     f"no hay recursos válidos para enviar — rechazada",
                 )
                 registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
+                _enviar_rechazo_no_silencioso(
+                    agente,
+                    remitente,
+                    asunto,
+                    "no tengo recursos válidos para cumplir lo pedido",
+                )
                 agente.remitentes_gestionados_esta_ronda.add(remitente)
             else:
                 agente._log(
@@ -344,6 +361,12 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
                     f"no tengo suficientes excedentes para enviar {r.piden}",
                 )
                 registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
+                _enviar_rechazo_no_silencioso(
+                    agente,
+                    remitente,
+                    asunto,
+                    f"no tengo suficientes excedentes para enviar {r.piden}",
+                )
                 agente.remitentes_gestionados_esta_ronda.add(remitente)
 
         elif decision == "contraofertar" and hay_oferta:
@@ -356,6 +379,9 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
                     f"Contraoferta de IA inválida para {remitente} ({razon})",
                 )
                 registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
+                _enviar_rechazo_no_silencioso(
+                    agente, remitente, asunto, f"no puedo contraofertar ({razon})"
+                )
                 agente.remitentes_gestionados_esta_ronda.add(remitente)
             else:
                 exc_disp = agente._excedentes_disponibles(excedentes)
@@ -370,6 +396,12 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
                         {"ofrezco": contra["_ofrezco"], "excedentes": exc_disp},
                     )
                     registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
+                    _enviar_rechazo_no_silencioso(
+                        agente,
+                        remitente,
+                        asunto,
+                        "no tengo excedente suficiente para contraofertar",
+                    )
                     agente.remitentes_gestionados_esta_ronda.add(remitente)
                 else:
                     agente._log(
@@ -404,10 +436,8 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
         elif hay_oferta:
             agente._log("DECISION", f"RECHAZO oferta de {remitente} ({razon})")
             registrar_rechazo_propio(agente, remitente, r.ofrecen, r.piden)
-            agente._log(
-                "INFO",
-                f"Oferta de {remitente} no interesante: no se envía respuesta directa",
-            )
+            _enviar_rechazo_no_silencioso(agente, remitente, asunto, razon)
+            agente._log("INFO", f"Oferta de {remitente} rechazada con respuesta explícita")
             agente.remitentes_gestionados_esta_ronda.add(remitente)
         else:
             agente._log("INFO", f"Mensaje de {remitente} sin propuesta clara: {razon}")

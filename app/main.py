@@ -70,7 +70,13 @@ console = Console()
     help="Segundos de espera entre rondas.",
 )
 @click.option("--api-url", default=None, help="URL base de la API del juego.")
-def main(alias, modelo, debug, max_rondas, pausa, api_url):
+@click.option(
+    "--sin-cooldown",
+    is_flag=True,
+    default=False,
+    help="Desactiva cooldown de contacto/rechazo adaptado y filtro de oferta duplicada.",
+)
+def main(alias, modelo, debug, max_rondas, pausa, api_url, sin_cooldown):
     """🤖 Agente Negociador Autónomo para fdi-pln-butler."""
     if not modelo_soporta_tools(modelo):
         console.print(
@@ -90,6 +96,7 @@ def main(alias, modelo, debug, max_rondas, pausa, api_url):
             pausa=pausa,
             interactivo=False,
             api_url=api_url,
+            sin_cooldown=sin_cooldown,
         )
         return
 
@@ -156,6 +163,7 @@ def _menu_agente(alias: str):
     debug = Confirm.ask("¿Activar modo DEBUG?", default=True)
     max_rondas = IntPrompt.ask("Máximo de rondas", default=10)
     pausa = IntPrompt.ask("Segundos entre rondas", default=30)
+    sin_cooldown = Confirm.ask("¿Desactivar cooldowns?", default=False)
 
     # ── Confirmar ────────────────────────────────────────────────────────
     resumen = Table(
@@ -171,13 +179,22 @@ def _menu_agente(alias: str):
     resumen.add_row("Debug", "✅ ACTIVADO" if debug else "desactivado")
     resumen.add_row("Max rondas", str(max_rondas))
     resumen.add_row("Pausa", f"{pausa}s")
+    resumen.add_row("Cooldown", "🚫 DESACTIVADO" if sin_cooldown else "activo")
 
     console.print(resumen)
 
     if not Confirm.ask("\n¿Iniciar agente?", default=True):
         return
 
-    _ejecutar_agente(alias, modelo, debug, max_rondas, pausa, interactivo=True)
+    _ejecutar_agente(
+        alias,
+        modelo,
+        debug,
+        max_rondas,
+        pausa,
+        interactivo=True,
+        sin_cooldown=sin_cooldown,
+    )
 
 
 # =========================================================================
@@ -193,10 +210,13 @@ def _ejecutar_agente(
     pausa: int,
     interactivo: bool = False,
     api_url: str = None,
+    sin_cooldown: bool = False,
 ):
     """Crea y ejecuta el agente negociador."""
     try:
-        agente = AgenteNegociador(alias, modelo, debug, api_url=api_url)
+        agente = AgenteNegociador(
+            alias, modelo, debug, api_url=api_url, sin_cooldown=sin_cooldown
+        )
     except ValueError as e:
         console.print(f"[red]❌ {e}[/]")
         return

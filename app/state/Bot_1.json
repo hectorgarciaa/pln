@@ -1,0 +1,130 @@
+{
+  "acuerdos_pendientes": {},
+  "acuerdos_expirados_tx": {
+    "f8e3d87b02": {
+      "remitente": "profe",
+      "acuerdo": {
+        "tx_id": "f8e3d87b02",
+        "recursos_dar": {
+          "aceite": 1
+        },
+        "recursos_pedir": {
+          "piedra": 1
+        },
+        "timestamp": 1772127804.0310502
+      },
+      "expira_en": 1772128147.642917
+    },
+    "bf34a788bf": {
+      "remitente": "Bot_2",
+      "acuerdo": {
+        "tx_id": "bf34a788bf",
+        "recursos_dar": {
+          "aceite": 1
+        },
+        "recursos_pedir": {
+          "queso": 1
+        },
+        "timestamp": 1772127805.0386143
+      },
+      "expira_en": 1772128147.642917
+    },
+    "f71179c3cd": {
+      "remitente": "profe",
+      "acuerdo": {
+        "tx_id": "f71179c3cd",
+        "recursos_dar": {
+          "vino": 1
+        },
+        "recursos_pedir": {
+          "piedra": 1
+        },
+        "timestamp": 1772127897.634251
+      },
+      "expira_en": 1772128162.6475499
+    },
+    "7187d87477": {
+      "remitente": "Bot_2",
+      "acuerdo": {
+        "tx_id": "7187d87477",
+        "recursos_dar": {
+          "vino": 1
+        },
+        "recursos_pedir": {
+          "piedra": 1
+        },
+        "timestamp": 1772127907.653635
+      },
+      "expira_en": 1772128177.6512063
+    }
+  },
+  "acuerdos_expirados_por_remitente": {
+    "profe": [
+      {
+        "remitente": "profe",
+        "acuerdo": {
+          "tx_id": "f8e3d87b02",
+          "recursos_dar": {
+            "aceite": 1
+          },
+          "recursos_pedir": {
+            "piedra": 1
+          },
+          "timestamp": 1772127804.0310502
+        },
+        "expira_en": 1772128147.642917
+      },
+      {
+        "remitente": "profe",
+        "acuerdo": {
+          "tx_id": "f71179c3cd",
+          "recursos_dar": {
+            "vino": 1
+          },
+          "recursos_pedir": {
+            "piedra": 1
+          },
+          "timestamp": 1772127897.634251
+        },
+        "expira_en": 1772128162.6475499
+      }
+    ],
+    "Bot_2": [
+      {
+        "remitente": "Bot_2",
+        "acuerdo": {
+          "tx_id": "bf34a788bf",
+          "recursos_dar": {
+            "aceite": 1
+          },
+          "recursos_pedir": {
+            "queso": 1
+          },
+          "timestamp": 1772127805.0386143
+        },
+        "expira_en": 1772128147.642917
+      },
+      {
+        "remitente": "Bot_2",
+        "acuerdo": {
+          "tx_id": "7187d87477",
+          "recursos_dar": {
+            "vino": 1
+          },
+          "recursos_pedir": {
+            "piedra": 1
+          },
+          "timestamp": 1772127907.653635
+        },
+        "expira_en": 1772128177.6512063
+      }
+    ]
+  },
+  "tx_cerrados": {},
+  "propuestas_enviadas": {},
+  "rechazos_recibidos": {
+    "Bot_2|arroz|vino": 2,
+    "profe|aceite|piedra": 2
+  },
+  "updated_at": 1772127972.6584566
+}

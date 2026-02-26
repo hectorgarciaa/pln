@@ -68,6 +68,7 @@ class AgenteNegociador:
         modelo: str = MODELO_DEFAULT,
         debug: bool = False,
         api_url: str = None,
+        sin_cooldown: bool = False,
     ):
         if not modelo_soporta_tools(modelo):
             raise ValueError(
@@ -79,6 +80,7 @@ class AgenteNegociador:
         self.ia = OllamaClient(modelo)
         self.analisis_mensajes = AnalisisMensajesService(modelo)
         self.debug = debug
+        self.sin_cooldown = bool(sin_cooldown)
 
         # Estado
         self.modo = ModoAgente.CONSEGUIR_OBJETIVO
@@ -124,8 +126,8 @@ class AgenteNegociador:
         self.max_propuestas_por_ronda = 3
 
         # Anti-spam y cooldowns
-        self.COOLDOWN_CONTACTO_SEGUNDOS: int = 90
-        self.COOLDOWN_RECHAZO_ADAPTADO_SEGUNDOS: int = 120
+        self.COOLDOWN_CONTACTO_SEGUNDOS: int = 30
+        self.COOLDOWN_RECHAZO_ADAPTADO_SEGUNDOS: int = 45
         self.SPAM_VENTANA_SEGUNDOS: int = 90
         self.SPAM_MAX_CARTAS_VENTANA: int = 5
         self.SPAM_SILENCIO_SEGUNDOS: int = 180
@@ -136,6 +138,11 @@ class AgenteNegociador:
         self.remitente_silenciado_hasta: Dict[str, float] = {}
         self.ofertas_recientes: Dict[str, float] = {}
         self.remitentes_gestionados_esta_ronda: set[str] = set()
+
+        if self.sin_cooldown:
+            self.COOLDOWN_CONTACTO_SEGUNDOS = 0
+            self.COOLDOWN_RECHAZO_ADAPTADO_SEGUNDOS = 0
+            self.OFERTA_DUPLICADA_TTL_SEGUNDOS = 0
 
         # ── Configurar loguru ────────────────────────────────────────────
         # Limpiar handlers previos (evitar duplicados en multi-bot)
