@@ -72,6 +72,7 @@ console = Console()
 @click.option("--api-url", default=None, help="URL base de la API del juego.")
 @click.option(
     "--sin-cooldown",
+    "--sinc",
     is_flag=True,
     default=False,
     help="Desactiva cooldown de contacto/rechazo adaptado y filtro de oferta duplicada.",
