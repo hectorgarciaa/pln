@@ -4,6 +4,12 @@ __pycache__/
 *$py.class
 .pytest_cache/
 .python-version
+.ruff_cache/
+
+# --- Build / distribución ---
+dist/
+build/
+*.egg-info/
 
 # --- Entornos Virtuales ---
 # En tu imagen se ve la carpeta .venv, es fundamental ignorarla
@@ -17,10 +23,15 @@ env/
 # uv.lock 
 
 # --- Logs y Datos temporales ---
-# He visto que tienes una carpeta 'app/logs', mejor que no suba tus trazas
 app/logs/
 *.log
 estado_butler.json
+
+# --- Estado de runtime del agente ---
+app/state/*.json
+
+# --- Variables de entorno locales ---
+.env
 # --- Archivos de configuración de IDE ---
 .vscode/
 .idea/
