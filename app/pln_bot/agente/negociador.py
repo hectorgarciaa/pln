@@ -425,6 +425,7 @@ class AgenteNegociador:
         excedentes: Optional[Dict[str, int]] = None,
         recursos_actuales: Optional[Dict[str, int]] = None,
         objetivo: Optional[Dict[str, int]] = None,
+        modo_analisis: str = "normal",
     ) -> RespuestaUnificada:
         """Analiza un mensaje con UNA sola llamada IA (aceptación + extracción).
 
@@ -441,6 +442,7 @@ class AgenteNegociador:
                 recursos_actuales=recursos_actuales,
                 objetivo=objetivo,
                 modo_agente=self.modo.value,
+                modo_analisis=modo_analisis,
             )
             duracion_ms = int((time.perf_counter() - inicio) * 1000)
             self._log(

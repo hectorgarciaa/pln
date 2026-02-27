@@ -253,6 +253,7 @@ class AnalisisMensajesService:
         recursos_actuales: Optional[Dict[str, int]] = None,
         objetivo: Optional[Dict[str, int]] = None,
         modo_agente: str = "",
+        modo_analisis: Literal["normal", "estructurado"] = "normal",
     ) -> RespuestaUnificada:
         self._actualizar_contexto(
             modo_agente=modo_agente,
@@ -262,6 +263,35 @@ class AnalisisMensajesService:
             objetivo=objetivo,
         )
         mensaje_recortado = self._recortar_texto(mensaje)
+        es_estructurado = modo_analisis == "estructurado"
+
+        if es_estructurado:
+            # Camino rápido: seguimos usando LLM+pydantic, pero sin tools ni segundo intento largo.
+            prompt_estructurado = (
+                f"{self._prefijo_prompt()}"
+                "Analiza una oferta estructurada y devuelve salida estrictamente estructurada.\n"
+                "No llames tools.\n\n"
+                f"REMITENTE: {remitente}\n"
+                f"ASUNTO: {asunto or '(sin asunto)'}\n"
+                "MENSAJE:\n"
+                f"{mensaje_recortado}\n\n"
+                "Reglas:\n"
+                "- Extrae recursos/cantidades solo explícitos.\n"
+                "- decision en {aceptar,rechazar,contraofertar,ignorar}.\n"
+                "- contraoferta_* solo si decision=contraofertar.\n"
+                "- razon maxima 10 palabras.\n"
+                "- Sin texto adicional fuera de la estructura."
+            )
+            limits_estructurado = UsageLimits(
+                request_limit=2,
+                tool_calls_limit=3,
+                response_tokens_limit=300,
+            )
+            result = self._agente.run_sync(
+                prompt_estructurado,
+                usage_limits=limits_estructurado,
+            )
+            return result.output
 
         prompt_usuario = (
             f"{self._prefijo_prompt()}"
@@ -280,7 +310,7 @@ class AnalisisMensajesService:
             "- Devuelve una razon MUY corta (maximo 15 palabras)."
         )
         limits_principal = UsageLimits(
-            request_limit=1,
+            request_limit=4,
             tool_calls_limit=3,
             response_tokens_limit=600,
         )
@@ -305,9 +335,9 @@ class AnalisisMensajesService:
                 "- razon maximo 10 palabras."
             )
             limits_rescate = UsageLimits(
-                request_limit=1,
-                tool_calls_limit=0,
-                response_tokens_limit=180,
+                request_limit=2,
+                tool_calls_limit=3,
+                response_tokens_limit=300,
             )
             try:
                 result = self._agente.run_sync(

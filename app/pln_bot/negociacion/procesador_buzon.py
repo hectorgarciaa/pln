@@ -357,6 +357,7 @@ def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
                 excedentes=excedentes,
                 recursos_actuales=recursos_actuales,
                 objetivo=objetivo_actual,
+                modo_analisis="estructurado" if carta_estructurada else "normal",
             )
             analisis_llm_realizados += 1
             if carta_estructurada:

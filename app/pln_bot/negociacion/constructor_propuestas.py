@@ -11,6 +11,13 @@ def nuevo_tx_id() -> str:
     return uuid.uuid4().hex[:10]
 
 
+def _en_modo_maximizar_oro(agente) -> bool:
+    """Indica si el agente está en modo de venta de excedentes por oro."""
+    modo = getattr(agente, "modo", None)
+    modo_valor = getattr(modo, "value", str(modo)).strip().lower()
+    return modo_valor == "maximizar_oro"
+
+
 def generar_propuesta(
     agente, destinatario: str, necesidades: Dict, excedentes: Dict, oro: int
 ) -> Optional[Dict[str, str]]:
@@ -136,15 +143,27 @@ def generar_propuesta(
         if not encontrado:
             return None
     elif exc_disp:
-        recurso_ofrezco = list(exc_disp.keys())[0]
+        # Elegimos el excedente más alto para vender antes lo que más sobra.
+        recurso_ofrezco = max(exc_disp.items(), key=lambda kv: (kv[1], kv[0]))[0]
+        cantidad_ofrezco = 1
+        en_max_oro = _en_modo_maximizar_oro(agente)
+        cantidad_oro_pedida = (
+            max(3, cantidad_ofrezco * 3) if en_max_oro else 1
+        )
         clave = (destinatario, recurso_ofrezco, "oro")
         if agente._rechazo_vigente(clave):
             return None
         en_backoff, _ = agente._combo_en_backoff(clave)
         if en_backoff:
             return None
-        ofrezco = {recurso_ofrezco: 1}
-        pido = {"oro": 1}
+        ofrezco = {recurso_ofrezco: cantidad_ofrezco}
+        pido = {"oro": cantidad_oro_pedida}
+        if en_max_oro:
+            agente._log(
+                "INFO",
+                f"Modo MAXIMIZAR_ORO: pidiendo {cantidad_oro_pedida} oro "
+                f"por {cantidad_ofrezco} {recurso_ofrezco}",
+            )
     else:
         return None
 
