@@ -24,3 +24,9 @@ loguru>=0.7.3
 
 # ── Validación de datos ─────────────────────────────────────────────────
 pydantic>=2.12.5
+
+# ── IA estructurada (salida tipada con pydantic-ai) ─────────────────────
+pydantic-ai>=1.57.0
+
+# ── Carga de variables de entorno (.env) ────────────────────────────────
+python-dotenv>=1.1.0
