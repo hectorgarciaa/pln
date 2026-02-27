@@ -98,6 +98,7 @@ def lanzar_modo_logs(
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONUTF8"] = "1"  # Forzar UTF-8 en Windows
 
     for alias in aliases:
         log_path = LOGS_DIR / f"{alias}_{timestamp}.log"
@@ -131,6 +132,7 @@ def lanzar_modo_consola(
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONUTF8"] = "1"  # Forzar UTF-8 en Windows
 
     def lector(alias: str, stream, estilo: str):
         prefijo = f"[{estilo}][{alias}][/{estilo}] "
@@ -151,6 +153,7 @@ def lanzar_modo_consola(
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
             bufsize=1,
             cwd=str(MAIN_SCRIPT.parent),
             env=env,

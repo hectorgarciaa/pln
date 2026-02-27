@@ -180,6 +180,9 @@ def _decision_rapida_oferta(
 def procesar_buzon(agente, necesidades: Dict, excedentes: Dict) -> int:
     """Procesa todas las cartas del buzón usando IA para lenguaje natural."""
     buzon = agente.info_actual.get("Buzon", {}) if agente.info_actual else {}
+    # Protección adicional: si Buzon es None, convertir a dict vacío
+    if buzon is None:
+        buzon = {}
     intercambios = 0
     analisis_llm_realizados = 0
     max_analisis_llm = max(1, int(getattr(agente, "max_analisis_llm_por_ronda", 3)))
