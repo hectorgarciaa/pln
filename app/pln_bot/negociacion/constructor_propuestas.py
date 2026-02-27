@@ -147,9 +147,7 @@ def generar_propuesta(
         recurso_ofrezco = max(exc_disp.items(), key=lambda kv: (kv[1], kv[0]))[0]
         cantidad_ofrezco = 1
         en_max_oro = _en_modo_maximizar_oro(agente)
-        cantidad_oro_pedida = (
-            max(3, cantidad_ofrezco * 3) if en_max_oro else 1
-        )
+        cantidad_oro_pedida = max(3, cantidad_ofrezco * 3) if en_max_oro else 1
         clave = (destinatario, recurso_ofrezco, "oro")
         if agente._rechazo_vigente(clave):
             return None

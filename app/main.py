@@ -18,11 +18,13 @@ from rich.panel import Panel
 from rich.prompt import Prompt, IntPrompt, Confirm
 from rich.table import Table
 
-from pln_bot.agente.negociador import AgenteNegociador
-from pln_bot.services.api_client import APIClient
-from pln_bot.core.config import (
+from app.pln_bot.agente.negociador import AgenteNegociador
+from app.pln_bot.services.api_client import APIClient
+from app.pln_bot.core.config import (
     MODELOS_DISPONIBLES,
     MODELO_DEFAULT,
+    MAX_RONDAS,
+    PAUSA_ENTRE_RONDAS,
     modelo_soporta_tools,
 )
 
@@ -58,14 +60,14 @@ console = Console()
 @click.option(
     "--max-rondas",
     "-r",
-    default=10,
+    default=MAX_RONDAS,
     show_default=True,
     help="Rondas máximas de negociación.",
 )
 @click.option(
     "--pausa",
     "-p",
-    default=30,
+    default=PAUSA_ENTRE_RONDAS,
     show_default=True,
     help="Segundos de espera entre rondas.",
 )
@@ -154,8 +156,8 @@ def _menu_agente(alias: str):
 
     # ── Opciones ─────────────────────────────────────────────────────────
     debug = Confirm.ask("¿Activar modo DEBUG?", default=True)
-    max_rondas = IntPrompt.ask("Máximo de rondas", default=10)
-    pausa = IntPrompt.ask("Segundos entre rondas", default=30)
+    max_rondas = IntPrompt.ask("Máximo de rondas", default=MAX_RONDAS)
+    pausa = IntPrompt.ask("Segundos entre rondas", default=PAUSA_ENTRE_RONDAS)
 
     # ── Confirmar ────────────────────────────────────────────────────────
     resumen = Table(

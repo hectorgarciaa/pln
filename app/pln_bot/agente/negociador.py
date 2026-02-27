@@ -28,13 +28,21 @@ from ..core.config import (
     MODELO_DEFAULT,
     MAX_ANALISIS_LLM_POR_RONDA,
     FORZAR_LLM_EN_OFERTAS_ESTRUCTURADAS,
+    MAX_RONDAS,
+    PAUSA_ENTRE_RONDAS,
+    PAUSA_ENTRE_ACCIONES,
+    MAX_PROPUESTAS_POR_RONDA,
+    RECHAZO_TTL_RONDAS,
+    ACUERDO_TTL_SEGUNDOS,
+    ACUERDO_GRACIA_TTL_SEGUNDOS,
+    TX_CERRADO_TTL_SEGUNDOS,
+    BACKOFF_ESCALA_RONDAS,
+    BACKOFF_RETENCION_RONDAS,
     modelo_soporta_tools,
 )
 from .ronda import ejecutar_ronda
 from ..services.analysis import AnalisisMensajesService, RespuestaUnificada
 from ..services.api_client import APIClient
-from ..services.ollama_client import OllamaClient
-from ..negociacion.constructor_propuestas import generar_propuesta
 
 # ── Rich console compartida ─────────────────────────────────────────────
 console = Console()
@@ -81,8 +89,8 @@ class AgenteNegociador:
 
         self.alias = alias
         self.api = APIClient(base_url=api_url, agente=alias)
-        self.ia = OllamaClient(modelo)
         self.analisis_mensajes = AnalisisMensajesService(modelo)
+        self.modelo = modelo
         self.debug = debug
 
         # Estado
@@ -113,24 +121,24 @@ class AgenteNegociador:
         # clave = (destinatario, recurso_ofrezco, recurso_pido), valor = ronda
         # Expiran tras RECHAZO_TTL rondas para reintentar con nuevas condiciones
         self.rechazos_recibidos: Dict[tuple, int] = {}
-        self.RECHAZO_TTL: int = 2  # rondas antes de reintentar un combo rechazado
+        self.RECHAZO_TTL = RECHAZO_TTL_RONDAS
         # Ventanas de tiempo para gestión robusta de acuerdos.
-        self.ACUERDO_TTL_SEGUNDOS: int = 300
-        self.ACUERDO_GRACIA_TTL_SEGUNDOS: int = 240
-        self.TX_CERRADO_TTL_SEGUNDOS: int = 1200
+        self.ACUERDO_TTL_SEGUNDOS = ACUERDO_TTL_SEGUNDOS
+        self.ACUERDO_GRACIA_TTL_SEGUNDOS = ACUERDO_GRACIA_TTL_SEGUNDOS
+        self.TX_CERRADO_TTL_SEGUNDOS = TX_CERRADO_TTL_SEGUNDOS
 
         # Snapshot de recursos para detectar paquetes recibidos
         self.recursos_ronda_anterior: Dict[str, int] = {}
 
         # Configuración
-        self.pausa_entre_acciones = 1
-        self.pausa_entre_rondas = 30
-        self.max_rondas = 10
-        self.max_propuestas_por_ronda = 3
+        self.pausa_entre_acciones = PAUSA_ENTRE_ACCIONES
+        self.pausa_entre_rondas = PAUSA_ENTRE_RONDAS
+        self.max_rondas = MAX_RONDAS
+        self.max_propuestas_por_ronda = MAX_PROPUESTAS_POR_RONDA
         self.max_analisis_llm_por_ronda = MAX_ANALISIS_LLM_POR_RONDA
         self.forzar_llm_en_ofertas_estructuradas = FORZAR_LLM_EN_OFERTAS_ESTRUCTURADAS
-        self.BACKOFF_ESCALA_RONDAS: tuple[int, ...] = (1, 2, 4, 6)
-        self.BACKOFF_RETENCION_RONDAS: int = 20
+        self.BACKOFF_ESCALA_RONDAS = BACKOFF_ESCALA_RONDAS
+        self.BACKOFF_RETENCION_RONDAS = BACKOFF_RETENCION_RONDAS
         self.backoff_combos: Dict[tuple, Dict[str, int | str]] = {}
 
         # ── Configurar loguru ────────────────────────────────────────────
@@ -697,7 +705,7 @@ class AgenteNegociador:
             Panel.fit(
                 f"[bold]🤖 AGENTE NEGOCIADOR AUTÓNOMO[/bold]\n\n"
                 f"  Alias:      [cyan]{self.alias}[/]\n"
-                f"  Modelo:     [cyan]{self.ia.modelo}[/]\n"
+                f"  Modelo:     [cyan]{self.modelo}[/]\n"
                 f"  Debug:      [{'green' if self.debug else 'dim'}]"
                 f"{'ACTIVADO' if self.debug else 'desactivado'}[/]\n"
                 f"  Max rondas: [cyan]{max_rondas}[/]",

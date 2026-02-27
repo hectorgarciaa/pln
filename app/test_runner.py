@@ -28,14 +28,16 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from pln_bot.core.config import modelo_soporta_tools
+from app.pln_bot.core.config import (
+    MODELO_DEFAULT,
+    MAX_RONDAS,
+    PAUSA_ENTRE_RONDAS,
+    NUM_BOTS_DEFAULT,
+    PREFIJO_BOTS,
+    modelo_soporta_tools,
+)
 
 # ── Configuración ────────────────────────────────────────────────────────
-DEFAULT_N = 3
-DEFAULT_MODELO = "qwen3:8b"
-DEFAULT_MAX_RONDAS = 10
-DEFAULT_PAUSA = 30
-DEFAULT_PREFIJO = "Bot"
 APP_DIR = Path(__file__).resolve().parent
 LOGS_DIR = APP_DIR / "logs"
 MAIN_SCRIPT = APP_DIR / "main.py"
@@ -235,18 +237,18 @@ def _tabla_resumen(procesos: list) -> Table:
 @click.option(
     "-n",
     "num_bots",
-    default=DEFAULT_N,
+    default=NUM_BOTS_DEFAULT,
     show_default=True,
     help="Número de bots a lanzar.",
 )
 @click.option(
     "--prefijo",
-    default=DEFAULT_PREFIJO,
+    default=PREFIJO_BOTS,
     show_default=True,
     help="Prefijo para los nombres de los bots.",
 )
 @click.option(
-    "-m", "--modelo", default=DEFAULT_MODELO, show_default=True, help="Modelo de IA."
+    "-m", "--modelo", default=MODELO_DEFAULT, show_default=True, help="Modelo de IA."
 )
 @click.option(
     "-d",
@@ -258,14 +260,14 @@ def _tabla_resumen(procesos: list) -> Table:
 @click.option(
     "-r",
     "--max-rondas",
-    default=DEFAULT_MAX_RONDAS,
+    default=MAX_RONDAS,
     show_default=True,
     help="Rondas máximas por bot.",
 )
 @click.option(
     "-p",
     "--pausa",
-    default=DEFAULT_PAUSA,
+    default=PAUSA_ENTRE_RONDAS,
     show_default=True,
     help="Pausa entre rondas (segundos).",
 )
