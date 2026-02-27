@@ -78,7 +78,7 @@ class AnalisisMensajesService:
         ai_settings = ModelSettings(
             temperature=0.1,
             top_p=0.8,
-            max_tokens=256,
+            max_tokens=320,
             timeout=25.0,
             parallel_tool_calls=False,
         )
@@ -98,6 +98,11 @@ class AnalisisMensajesService:
                 "Debes analizar el mensaje y tomar una decisión de negociación.\n"
                 "Si detectas oferta o intercambio, usa tools antes de decidir.\n"
                 "Debes invocar tools para validar stock/necesidad/excedente.\n\n"
+                "Reglas de brevedad estrictas:\n"
+                "- Responde SOLO con datos estructurados, sin texto adicional.\n"
+                "- razon debe tener como máximo 15 palabras.\n"
+                "- No repitas el mensaje original ni expliques pasos internos.\n"
+                "- Si no hay oferta clara, devuelve ofrecen={} y piden={}.\n\n"
                 "Responde con TODOS estos campos:\n\n"
                 "1) es_aceptacion: ¿El mensaje ACEPTA un trato previo?\n"
                 "   - SÍ si contiene frases como: 'acepto el trato', 'trato hecho',\n"
@@ -248,17 +253,18 @@ class AnalisisMensajesService:
             f"EXCEDENTES_PRINCIPALES: {self._resumen_contexto(excedentes)}\n\n"
             "MENSAJE:\n"
             f"{mensaje}\n\n"
-            "Instrucciones críticas:\n"
-            "- Si hay oferta, llama tools y valida stock/necesidad/excedente.\n"
-            "- Si decides contraofertar, rellena contraoferta_ofrezco y contraoferta_pido.\n"
-            "- No inventes cantidades ni recursos."
+                "Instrucciones críticas:\n"
+                "- Si hay oferta, llama tools y valida stock/necesidad/excedente.\n"
+                "- Si decides contraofertar, rellena contraoferta_ofrezco y contraoferta_pido.\n"
+                "- No inventes cantidades ni recursos.\n"
+                "- Devuelve una razon MUY corta (maximo 15 palabras)."
         )
         result = self._agente.run_sync(
             prompt_usuario,
             usage_limits=UsageLimits(
                 request_limit=1,
                 tool_calls_limit=8,
-                response_tokens_limit=256,
+                response_tokens_limit=320,
             ),
         )
         return result.output
