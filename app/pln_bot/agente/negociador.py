@@ -572,41 +572,6 @@ class AgenteNegociador:
             if next_round <= self.ronda_actual and updated_round < umbral:
                 del self.backoff_combos[clave]
 
-    def _generar_texto_propuesta_ia(
-        self, destinatario: str, necesidades: Dict, excedentes: Dict, oro: int
-    ) -> Optional[Dict]:
-        """Usa IA para redactar la propuesta (la lógica es programática)."""
-        propuesta = generar_propuesta(self, destinatario, necesidades, excedentes, oro)
-        if not propuesta:
-            return None
-
-        ofrezco_str = ", ".join(f"{c} {r}" for r, c in propuesta["_ofrezco"].items())
-        pido_str = ", ".join(f"{c} {r}" for r, c in propuesta["_pido"].items())
-
-        prompt = (
-            f"Genera un mensaje corto, amigable y natural para proponer un intercambio "
-            f"de recursos en un juego.\n\n"
-            f"DESTINATARIO: {destinatario}\nYO SOY: {self.alias}\n"
-            f"OFREZCO: {ofrezco_str}\nPIDO: {pido_str}\n\n"
-            f"El mensaje debe dejar MUY CLARO qué ofreces y qué pides, "
-            f"con las cantidades exactas. Escríbelo como un humano, sin etiquetas "
-            f"ni formatos especiales.\n"
-            f"IMPORTANTE: Termina SIEMPRE el mensaje con esta frase exacta:\n"
-            f"\"Si aceptas, responde 'acepto el trato'. "
-            f"Si no te conviene, responde 'no me conviene'.\"\n"
-            f"Escribe SOLO el mensaje, nada más."
-        )
-
-        texto = self.ia.consultar(prompt, timeout=30, mostrar_progreso=False)
-        if texto and not texto.startswith("Error"):
-            tx_id = propuesta.get("_tx_id")
-            tx_tag = f" [tx:{tx_id}]" if tx_id else ""
-            propuesta["cuerpo"] = texto
-            propuesta["asunto"] = (
-                f"Intercambio:{tx_tag} mi {ofrezco_str} por tu {pido_str}"
-            )
-        return propuesta
-
     # =====================================================================
     # ACCIONES
     # =====================================================================
