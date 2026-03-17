@@ -2,9 +2,7 @@ from conf import FRONTMATTER_IDS
 from pathlib import Path
 from bs4 import BeautifulSoup
 
-# ============================================================================
 # 2. PARSING DEL HTML
-# ============================================================================
 
 def cargar_html(ruta: Path) -> BeautifulSoup:
     """Lee el archivo HTML y devuelve un objeto BeautifulSoup."""

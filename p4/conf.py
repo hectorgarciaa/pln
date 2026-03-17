@@ -1,10 +1,8 @@
 from pathlib import Path
 
-# ============================================================================
 # 1. CONFIGURACIÓN
-# ============================================================================
 
-HTML_PATH = Path(__file__).parent / "quijote" / "quijote.html"
+HTML_PATH = Path(Path(Path(__file__).parent, "quijote"), "quijote.html")
 NLP_MODEL = "es_core_news_sm"
 
 # IDs de front-matter a ignorar

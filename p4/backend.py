@@ -1,3 +1,6 @@
+import os
+from search_engine import BuscadorQuijote
+
 # ============================================================================
 # 5. FLASK WEB SERVER
 # ============================================================================
@@ -41,4 +44,3 @@ def crear_app(buscador: BuscadorQuijote):
         return jsonify({"capitulos": caps, "total": len(caps)})
 
     return app
-

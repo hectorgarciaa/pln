@@ -2,10 +2,7 @@ from conf import NLP_MODEL, STOPWORDS_ES
 import re
 import spacy
 
-# ============================================================================
 # 3. PREPROCESAMIENTO
-# ============================================================================
-
 def cargar_spacy(modelo: str = NLP_MODEL):
     nlp = spacy.load(modelo, disable=["ner", "parser"])
     nlp.max_length = 2_000_000

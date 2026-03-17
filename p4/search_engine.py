@@ -1,4 +1,7 @@
-from conf import HTML_PATH, FRONTMATTER_IDS
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from rank_bm25 import BM25Okapi
+from preprocesamiento import preprocesar_texto
 
 # ============================================================================
 # 4. MOTOR DE BÚSQUEDA

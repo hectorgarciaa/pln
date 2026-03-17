@@ -13,8 +13,11 @@ Uso:
 """
 
 import sys
-from rank_bm25 import BM25Okapi
-
+from conf import HTML_PATH
+from parseo import cargar_html, extraer_capitulos
+from preprocesamiento import cargar_spacy
+from search_engine import BuscadorQuijote
+from backend import crear_app
 
 
 def main_cli(buscador: BuscadorQuijote):
