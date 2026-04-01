@@ -3,22 +3,21 @@ from sklearn.metrics.pairwise import cosine_similarity
 from rank_bm25 import BM25Okapi
 from preprocesamiento import preprocesar_texto
 
-# ============================================================================
 # 4. MOTOR DE BÚSQUEDA
-# ============================================================================
 
 class BuscadorQuijote:
-    """Motor de búsqueda TF-IDF + BM25 con N-gramas (1,2)."""
+    """Motor de búsqueda TF-IDF + BM25 con N-gramas (1,2) sobre chunks de párrafos."""
 
-    def __init__(self, capitulos: list[dict], nlp):
-        self.capitulos = capitulos
+    def __init__(self, chunks: list[dict], nlp):
+        self.chunks = chunks
         self.nlp = nlp
 
-        print("⏳ Preprocesando capítulos...")
+        print(f"⏳ Preprocesando {len(chunks)} chunks...")
         self.textos_procesados = []
-        for i, cap in enumerate(capitulos):
-            print(f"  [{i+1}/{len(capitulos)}] Parte {cap['parte']} - {cap['titulo'][:55]}...")
-            self.textos_procesados.append(preprocesar_texto(cap["texto"], nlp))
+        for i, chunk in enumerate(chunks):
+            if (i + 1) % 50 == 0 or i == 0:
+                print(f"  [{i+1}/{len(chunks)}] {chunk['titulo'][:55]}...")
+            self.textos_procesados.append(preprocesar_texto(chunk["texto"], nlp))
 
         # TF-IDF
         print("\n📊 Construyendo índice TF-IDF (N-gramas 1,2)...")
@@ -60,13 +59,15 @@ class BuscadorQuijote:
         return [self._resultado(i, scores[i], qp) for i in idxs if scores[i] > 0]
 
     def _resultado(self, idx: int, score: float, qp: str) -> dict:
-        cap = self.capitulos[idx]
+        chunk = self.chunks[idx]
         return {
-            "parte": cap["parte"],
-            "titulo": cap["titulo"],
+            "parte": chunk["parte"],
+            "titulo": chunk["titulo"],
+            "cap_id": chunk["cap_id"],
+            "chunk_idx": chunk["chunk_idx"],
             "score": round(float(score), 4),
-            "fragmento": self._extraer_fragmento(cap["texto"], qp),
-            "num_palabras": len(cap["texto"].split()),
+            "fragmento": self._extraer_fragmento(chunk["texto"], qp),
+            "num_palabras": len(chunk["texto"].split()),
         }
 
     @staticmethod

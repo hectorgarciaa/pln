@@ -14,6 +14,7 @@ def extraer_capitulos(soup: BeautifulSoup) -> list[dict]:
     """
     Segmenta el libro en capítulos usando las etiquetas <h3> con <a name="...">.
     Ignora front-matter y licencia de Gutenberg.
+    Devuelve una lista de párrafos por capítulo (no texto concatenado).
     """
     secciones = []
     for h3 in soup.find_all("h3"):
@@ -30,7 +31,7 @@ def extraer_capitulos(soup: BeautifulSoup) -> list[dict]:
         if sec["id"] in FRONTMATTER_IDS:
             continue
 
-        textos = []
+        parrafos = []
         sibling = sec["elemento"].find_next_sibling()
         while sibling:
             if sibling.name == "h3" and sibling.find("a", attrs={"name": True}):
@@ -39,11 +40,10 @@ def extraer_capitulos(soup: BeautifulSoup) -> list[dict]:
                 break
             texto = sibling.get_text(" ", strip=True)
             if texto:
-                textos.append(texto)
+                parrafos.append(texto)
             sibling = sibling.find_next_sibling()
 
-        texto_cap = " ".join(textos)
-        if not texto_cap.strip():
+        if not parrafos:
             continue
 
         parte = "I" if sec["id"].startswith("1_") else "II"
@@ -51,7 +51,64 @@ def extraer_capitulos(soup: BeautifulSoup) -> list[dict]:
             "id": sec["id"],
             "parte": parte,
             "titulo": sec["titulo"],
-            "texto": texto_cap,
+            "parrafos": parrafos,
         })
 
     return capitulos
+
+
+def extraer_chunks(capitulos: list[dict], tam_ventana: int = 3, solapamiento: int = 1) -> list[dict]:
+    """
+    Genera chunks con ventana deslizante a partir de los párrafos de cada capítulo.
+
+    Ejemplo con tam_ventana=3, solapamiento=1:
+        párrafos: [p1, p2, p3, p4, p5]
+        chunks:   [p1+p2+p3], [p2+p3+p4], [p3+p4+p5]
+
+    Cada chunk incluye el título del capítulo al que pertenece.
+    """
+    paso = tam_ventana - solapamiento  # cuántos párrafos avanzamos en cada paso
+    chunks = []
+
+    for cap in capitulos:
+        parrafos = cap["parrafos"]
+        n = len(parrafos)
+
+        if n == 0:
+            continue
+
+        # Si el capítulo es más corto que la ventana, lo tomamos entero como un chunk
+        if n <= tam_ventana:
+            chunks.append({
+                "cap_id": cap["id"],
+                "parte": cap["parte"],
+                "titulo": cap["titulo"],
+                "texto": cap["titulo"] + " " + " ".join(parrafos),
+                "chunk_idx": 0,
+            })
+            continue
+
+        for inicio in range(0, n - tam_ventana + 1, paso):
+            ventana = parrafos[inicio: inicio + tam_ventana]
+            chunks.append({
+                "cap_id": cap["id"],
+                "parte": cap["parte"],
+                "titulo": cap["titulo"],
+                "texto": cap["titulo"] + " " + " ".join(ventana),
+                "chunk_idx": inicio // paso,
+            })
+
+        # Si quedaron párrafos finales que no forman una ventana completa,
+        # los añadimos como el último chunk (evita perder el final del capítulo)
+        ultimo_inicio = ((n - tam_ventana) // paso) * paso + paso
+        if ultimo_inicio < n:
+            ventana = parrafos[ultimo_inicio:]
+            chunks.append({
+                "cap_id": cap["id"],
+                "parte": cap["parte"],
+                "titulo": cap["titulo"],
+                "texto": cap["titulo"] + " " + " ".join(ventana),
+                "chunk_idx": -1,  # marca de "último fragmento residual"
+            })
+
+    return chunks

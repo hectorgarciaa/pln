@@ -14,7 +14,7 @@ Uso:
 
 import sys
 from conf import HTML_PATH
-from parseo import cargar_html, extraer_capitulos
+from parseo import cargar_html, extraer_capitulos, extraer_chunks
 from preprocesamiento import cargar_spacy
 from search_engine import BuscadorQuijote
 from backend import crear_app
@@ -54,8 +54,8 @@ def main_cli(buscador: BuscadorQuijote):
         print()
 
 
-def inicializar_motor():
-    """Carga HTML, extrae capítulos, construye índices."""
+def inicializar_motor(tam_ventana: int = 3, solapamiento: int = 1):
+    """Carga HTML, extrae chunks con ventana deslizante y construye índices."""
     print(f"📂 Cargando: {HTML_PATH}")
     if not HTML_PATH.exists():
         print(f"❌ No se encontró: {HTML_PATH}")
@@ -63,10 +63,13 @@ def inicializar_motor():
 
     soup = cargar_html(HTML_PATH)
     capitulos = extraer_capitulos(soup)
-    print(f"📑 {len(capitulos)} capítulos extraídos.\n")
+    print(f"📑 {len(capitulos)} capítulos extraídos.")
+
+    chunks = extraer_chunks(capitulos, tam_ventana=tam_ventana, solapamiento=solapamiento)
+    print(f"🧩 {len(chunks)} chunks generados (ventana={tam_ventana}, solapamiento={solapamiento}).\n")
 
     nlp = cargar_spacy()
-    return BuscadorQuijote(capitulos, nlp)
+    return BuscadorQuijote(chunks, nlp)
 
 
 if __name__ == "__main__":
