@@ -181,6 +181,20 @@ uv run --project p4 python -m p4.main build-all
 
 ## Uso rápido
 
+### Ejecutable principal
+
+Si entras en `p4/`, el programa puede arrancarse directamente con:
+
+```bash
+uv run fdi-pln-2602-p4
+```
+
+Desde la raíz del monorepo, el comando equivalente es:
+
+```bash
+uv run --project p4 fdi-pln-2602-p4
+```
+
 ### Abrir la TUI
 
 ```bash
@@ -191,6 +205,12 @@ o simplemente:
 
 ```bash
 uv run --project p4 python -m p4.main
+```
+
+o usando el ejecutable instalado del proyecto:
+
+```bash
+uv run --project p4 fdi-pln-2602-p4
 ```
 
 ### Buscar desde la CLI
@@ -310,6 +330,32 @@ uv run --project p4 python -m p4.main search "caballería andante" --mode semant
 uv run --project p4 python -m p4.main search "¿Qué interpreta don Quijote al ver los molinos?" --mode rag --top-k 3
 uv run --project p4 python -m p4.main rag "Resume el episodio de los molinos y cita las fuentes" --max-sources 3
 ```
+
+## Empaquetado y wheel
+
+La práctica se puede construir como wheel instalable. El wheel expone el ejecutable:
+
+- `fdi-pln-2602-p4`
+
+Construcción:
+
+```bash
+cd p4
+uv build
+```
+
+El artefacto esperado es un wheel con nombre normalizado similar a:
+
+```text
+fdi_pln_2602_p4-1.0-py3-none-any.whl
+```
+
+Ese wheel incluye:
+
+- el código Python
+- `settings.toml`
+- el corpus `quijote/quijote.html`
+- ficheros mínimos de runtime para `artifacts/` y `logs/`
 
 ## Configuración
 
