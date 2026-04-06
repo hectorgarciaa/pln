@@ -1,0 +1,26 @@
+[paths]
+corpus_path = "quijote/quijote.html"
+artifacts_dir = "artifacts"
+logs_dir = "logs"
+chunks_filename = "chunks.json"
+classical_index_filename = "classical_index.json"
+semantic_embeddings_filename = "semantic_embeddings.npz"
+semantic_manifest_filename = "semantic_manifest.json"
+
+[preprocessing]
+spacy_model = "es_core_news_lg"
+
+[chunking]
+target_words = 180
+overlap_words = 45
+
+[search]
+top_k = 8
+surface_weight = 0.35
+lemma_weight = 0.65
+
+[semantic]
+batch_size = 32
+
+[rag]
+enabled = false

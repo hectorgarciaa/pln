@@ -5,7 +5,7 @@ __pycache__/
 .pytest_cache/
 .python-version
 .ruff_cache/
-
+.codex
 # --- Build / distribución ---
 dist/
 build/
@@ -26,12 +26,17 @@ env/
 p1/app/logs/
 *.log
 estado_butler.json
+p4/artifacts/*
+!p4/artifacts/.gitkeep
+p4/logs/*
+!p4/logs/.gitkeep
 
 # --- Estado de runtime del agente ---
 p1/app/state/*.json
 
 # --- Variables de entorno locales ---
 .env
+p4/.env
 # --- Archivos de configuración de IDE ---
 .vscode/
 .idea/
