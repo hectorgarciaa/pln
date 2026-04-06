@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from p4.app.errors import QuijoteIRError
+from p4.app.models import RagResponse
 from p4.app.services import QuijoteSearchService
 
 
@@ -24,6 +25,7 @@ app = typer.Typer(
 class SearchMode(str, Enum):
     classical = "classical"
     semantic = "semantic"
+    rag = "rag"
 
 
 def _service() -> QuijoteSearchService:
@@ -45,6 +47,43 @@ def _render_results(mode: str, query: str, results) -> None:
             result.part,
             result.title,
             result.fragment,
+        )
+    console.print(table)
+
+
+def _render_rag_response(response: RagResponse) -> None:
+    answer_title = (
+        "Respuesta RAG (evidencia insuficiente)"
+        if response.metadata.get("insufficient_evidence")
+        else "Respuesta RAG"
+    )
+    console.print(
+        Panel(
+            response.answer,
+            title=answer_title,
+            border_style="green",
+        )
+    )
+
+    table = Table(title=f'Fuentes para "{response.query}"', show_lines=True)
+    table.add_column("Ref")
+    table.add_column("Usada")
+    table.add_column("Score", justify="right")
+    table.add_column("Parte")
+    table.add_column("Capítulo")
+    table.add_column("Chunk")
+    table.add_column("Fragmento", overflow="fold")
+
+    used_references = set(response.references)
+    for source in response.sources:
+        table.add_row(
+            source.source_id or "-",
+            "sí" if source.source_id in used_references else "no",
+            f"{source.score:.6f}",
+            source.part,
+            source.title,
+            source.chunk_id,
+            source.fragment,
         )
     console.print(table)
 
@@ -181,7 +220,12 @@ def search(
     """Ejecuta una búsqueda y muestra resultados en consola."""
 
     def _action() -> None:
-        results = _service().search(mode.value, query, top_k=top_k)
+        service = _service()
+        if mode is SearchMode.rag:
+            _render_rag_response(service.answer_rag(query, max_sources=top_k))
+            return
+
+        results = service.search(mode.value, query, top_k=top_k)
         if not results:
             console.print(
                 Panel(
@@ -192,6 +236,22 @@ def search(
             )
             return
         _render_results(mode.value, query, results)
+
+    _run_or_die(_action)
+
+
+@app.command("rag")
+def rag(
+    query: str = typer.Argument(..., help="Consulta de texto libre."),
+    max_sources: int = typer.Option(
+        4, "--max-sources", "-k", min=1, help="Número máximo de fuentes a mostrar."
+    ),
+) -> None:
+    """Ejecuta el modo RAG y muestra respuesta más fuentes citadas."""
+
+    def _action() -> None:
+        response = _service().answer_rag(query, max_sources=max_sources)
+        _render_rag_response(response)
 
     _run_or_die(_action)
 

@@ -12,7 +12,8 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Footer, Header, Input, Select, Static
 
 from p4.app.errors import QuijoteIRError
-from p4.app.models import SearchResult
+from p4.app.models import RagResponse, RagSource, SearchResult
+from p4.app.rag import format_rag_answer_markdown
 from p4.app.services import QuijoteSearchService
 
 
@@ -66,8 +67,16 @@ class QuijoteSearchTUI(App[None]):
         border: round $accent;
     }
 
+    #answer {
+        height: 13;
+        border: round $success;
+        padding: 1 2;
+        overflow-y: auto;
+        background: $panel-lighten-1;
+    }
+
     #detail {
-        height: 14;
+        height: 13;
         border: round $secondary;
         padding: 1 2;
         overflow-y: auto;
@@ -102,13 +111,14 @@ class QuijoteSearchTUI(App[None]):
         Binding("/", "focus_query", "Ir a búsqueda"),
         Binding("c", "set_classical_mode", "Clásica"),
         Binding("s", "set_semantic_mode", "Semántica"),
+        Binding("g", "set_rag_mode", "RAG"),
         Binding("q", "quit", "Salir"),
     ]
 
     def __init__(self, service: QuijoteSearchService) -> None:
         super().__init__()
         self.service = service
-        self.current_results: dict[str, SearchResult] = {}
+        self.current_results: dict[str, SearchResult | RagSource] = {}
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -120,6 +130,7 @@ class QuijoteSearchTUI(App[None]):
                     options=[
                         ("Clásica (TF-IDF + lemas)", "classical"),
                         ("Semántica (vectores spaCy)", "semantic"),
+                        ("RAG (híbrido + Ollama)", "rag"),
                     ],
                     value="classical",
                     id="mode-select",
@@ -134,6 +145,10 @@ class QuijoteSearchTUI(App[None]):
                 yield Button("Reconstruir embeddings", id="build-semantic")
                 yield Static("", id="artifact-status")
             with Vertical(id="main"):
+                yield Static(
+                    "La respuesta generada aparecerá aquí cuando uses el modo RAG.",
+                    id="answer",
+                )
                 yield DataTable(id="results")
                 yield Static(
                     "Selecciona un resultado para ver el detalle.", id="detail"
@@ -145,7 +160,7 @@ class QuijoteSearchTUI(App[None]):
         table = self.query_one("#results", DataTable)
         table.cursor_type = "row"
         table.zebra_stripes = True
-        table.add_columns("#", "Score", "Parte", "Capítulo", "Chunk")
+        table.add_columns("Ref", "Score", "Parte", "Capítulo", "Chunk")
         await self.refresh_artifact_status()
         self.action_focus_query()
 
@@ -168,6 +183,10 @@ class QuijoteSearchTUI(App[None]):
 
     def action_set_semantic_mode(self) -> None:
         self.query_one("#mode-select", Select).value = "semantic"
+        self.action_focus_query()
+
+    def action_set_rag_mode(self) -> None:
+        self.query_one("#mode-select", Select).value = "rag"
         self.action_focus_query()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -205,6 +224,10 @@ class QuijoteSearchTUI(App[None]):
             self.set_status("Introduce una consulta antes de buscar.")
             return
 
+        if mode == "rag":
+            await self.run_rag(query)
+            return
+
         self.set_status(f"Buscando en modo {mode}...")
         try:
             results = await asyncio.to_thread(
@@ -216,6 +239,7 @@ class QuijoteSearchTUI(App[None]):
             self.query_one("#detail", Static).update(str(exc))
             return
 
+        self.reset_answer_panel()
         self.populate_results(results)
         if not results:
             self.set_status("No se encontraron resultados.")
@@ -226,6 +250,31 @@ class QuijoteSearchTUI(App[None]):
 
         self.set_status(f"{len(results)} resultados cargados.")
         self.update_detail(results[0])
+
+    async def run_rag(self, query: str) -> None:
+        self.set_status("Recuperando contexto y generando respuesta RAG...")
+        try:
+            response = await asyncio.to_thread(self.service.answer_rag, query)
+        except QuijoteIRError as exc:
+            self.clear_results()
+            self.set_status(str(exc))
+            self.query_one("#answer", Static).update(str(exc))
+            self.query_one("#detail", Static).update(str(exc))
+            return
+
+        self.update_answer(response)
+        self.populate_results(response.sources)
+        if not response.sources:
+            self.query_one("#detail", Static).update(
+                "No se recuperaron fuentes suficientes para esta consulta."
+            )
+            self.set_status("Respuesta RAG generada sin fuentes recuperadas.")
+            return
+
+        self.update_detail(response.sources[0])
+        self.set_status(
+            f"Respuesta RAG generada con {len(response.references)} referencias citadas."
+        )
 
     async def run_build(self, target: str) -> None:
         actions = {
@@ -243,13 +292,14 @@ class QuijoteSearchTUI(App[None]):
         await self.refresh_artifact_status()
         self.set_status(f"Recurso '{target}' reconstruido correctamente.")
 
-    def populate_results(self, results: list[SearchResult]) -> None:
+    def populate_results(self, results: list[SearchResult | RagSource]) -> None:
         table = self.query_one("#results", DataTable)
         table.clear(columns=False)
         self.current_results = {result.chunk_id: result for result in results}
         for result in results:
+            row_label = result.source_id if hasattr(result, "source_id") and result.source_id else str(result.rank)
             table.add_row(
-                str(result.rank),
+                row_label,
                 f"{result.score:.6f}",
                 result.part,
                 result.title,
@@ -263,28 +313,56 @@ class QuijoteSearchTUI(App[None]):
         self.current_results = {}
         self.query_one("#results", DataTable).clear(columns=False)
 
-    def update_detail(self, result: SearchResult) -> None:
+    def update_detail(self, result: SearchResult | RagSource) -> None:
         explanation = result.explanation
-        matched_surface = ", ".join(explanation.get("matched_surface_terms", [])) or "-"
-        matched_lemma = ", ".join(explanation.get("matched_lemma_terms", [])) or "-"
-        markdown = Markdown(
-            "\n".join(
+        lines = [
+            f"## {result.title}",
+            f"**Parte:** {result.part}",
+        ]
+        if isinstance(result, RagSource) and result.source_id:
+            lines.append(f"**Fuente:** `[{result.source_id}]`")
+        lines.extend(
+            [
+                f"**Chunk:** `{result.chunk_id}`",
+                f"**Score:** `{result.score:.6f}`",
+                f"**Rango de párrafos:** {result.metadata.get('paragraph_span', '-')}",
+                f"**Tamaño del chunk:** {result.metadata.get('chunk_word_count', '-')} palabras",
+                f"**Modo:** {explanation.get('mode', '-')}",
+            ]
+        )
+
+        if isinstance(result, RagSource):
+            retrieval_modes = ", ".join(explanation.get("retrieval_modes", [])) or "-"
+            lines.extend(
                 [
-                    f"## {result.title}",
-                    f"**Parte:** {result.part}",
-                    f"**Chunk:** `{result.chunk_id}`",
-                    f"**Score:** `{result.score:.6f}`",
-                    f"**Rango de párrafos:** {result.metadata.get('paragraph_span', '-')}",
-                    f"**Tamaño del chunk:** {result.metadata.get('chunk_word_count', '-')} palabras",
-                    f"**Modo:** {explanation.get('mode', '-')}",
-                    f"**Términos exactos:** {matched_surface}",
-                    f"**Lemas coincidentes:** {matched_lemma}",
-                    "",
-                    result.fragment,
+                    f"**Recuperadores:** {retrieval_modes}",
+                    f"**Rango clásica:** {explanation.get('classical_rank', '-')}",
+                    f"**Rango semántica:** {explanation.get('semantic_rank', '-')}",
                 ]
             )
-        )
+        else:
+            matched_surface = ", ".join(explanation.get("matched_surface_terms", [])) or "-"
+            matched_lemma = ", ".join(explanation.get("matched_lemma_terms", [])) or "-"
+            lines.extend(
+                [
+                    f"**Términos exactos:** {matched_surface}",
+                    f"**Lemas coincidentes:** {matched_lemma}",
+                ]
+            )
+
+        lines.extend(["", result.fragment])
+        markdown = Markdown("\n".join(lines))
         self.query_one("#detail", Static).update(markdown)
+
+    def update_answer(self, response: RagResponse) -> None:
+        self.query_one("#answer", Static).update(
+            Markdown(format_rag_answer_markdown(response))
+        )
+
+    def reset_answer_panel(self) -> None:
+        self.query_one("#answer", Static).update(
+            "La respuesta generada aparecerá aquí cuando uses el modo RAG."
+        )
 
     def set_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)

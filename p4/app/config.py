@@ -32,7 +32,19 @@ class AppSettings:
     surface_weight: float
     lemma_weight: float
     semantic_batch_size: int
+    ollama_host: str
+    ollama_timeout_seconds: float
     rag_enabled: bool
+    rag_generation_model: str
+    rag_temperature: float
+    rag_num_predict: int
+    rag_hybrid_top_k: int
+    rag_max_sources: int
+    rag_max_context_chars: int
+    rag_max_source_chars: int
+    rag_classical_weight: float
+    rag_semantic_weight: float
+    rag_rrf_k: int
 
 
 @lru_cache(maxsize=1)
@@ -73,7 +85,19 @@ def load_settings() -> AppSettings:
         surface_weight=float(dynasettings.search.surface_weight),
         lemma_weight=float(dynasettings.search.lemma_weight),
         semantic_batch_size=int(dynasettings.semantic.batch_size),
+        ollama_host=str(dynasettings.ollama.host),
+        ollama_timeout_seconds=float(dynasettings.ollama.timeout_seconds),
         rag_enabled=bool(dynasettings.rag.enabled),
+        rag_generation_model=str(dynasettings.rag.generation_model),
+        rag_temperature=float(dynasettings.rag.temperature),
+        rag_num_predict=int(dynasettings.rag.num_predict),
+        rag_hybrid_top_k=int(dynasettings.rag.hybrid_top_k),
+        rag_max_sources=int(dynasettings.rag.max_sources),
+        rag_max_context_chars=int(dynasettings.rag.max_context_chars),
+        rag_max_source_chars=int(dynasettings.rag.max_source_chars),
+        rag_classical_weight=float(dynasettings.rag.classical_weight),
+        rag_semantic_weight=float(dynasettings.rag.semantic_weight),
+        rag_rrf_k=int(dynasettings.rag.rrf_k),
     )
 
 

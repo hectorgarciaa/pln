@@ -22,5 +22,19 @@ lemma_weight = 0.65
 [semantic]
 batch_size = 32
 
+[ollama]
+host = "http://127.0.0.1:11434"
+timeout_seconds = 30
+
 [rag]
-enabled = false
+enabled = true
+generation_model = "qwen3:8b"
+temperature = 0.2
+num_predict = 384
+hybrid_top_k = 6
+max_sources = 4
+max_context_chars = 6000
+max_source_chars = 1400
+classical_weight = 0.65
+semantic_weight = 0.35
+rrf_k = 10

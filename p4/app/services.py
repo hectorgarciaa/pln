@@ -13,12 +13,18 @@ from p4.app.config import AppSettings, frontmatter_ids, load_settings
 from p4.app.errors import (
     ArtifactMissingError,
     ConfigurationError,
+    RagGenerationError,
     ResourceOutOfDateError,
 )
 from p4.app.ingestion import extract_documents
 from p4.app.logging_utils import configure_logging
-from p4.app.models import Chunk, Document, SearchResult
+from p4.app.models import Chunk, Document, RagResponse, RagSource, SearchResult
 from p4.app.preprocessing import SpanishTextPreprocessor
+from p4.app.rag import (
+    ContextBuilder,
+    HybridRetriever,
+    OllamaRagGenerator,
+)
 from p4.app.semantic_search import SemanticSearchEngine, SpacyVectorEmbedder
 from p4.app.storage import (
     ensure_artifact,
@@ -201,6 +207,10 @@ class QuijoteSearchService:
             return []
 
         top_k = top_k or self.settings.top_k
+        if mode == "rag":
+            raise ConfigurationError(
+                "El modo RAG debe invocarse mediante `answer_rag()` para poder devolver respuesta y fuentes."
+            )
         if mode == "semantic":
             return self.search_semantic(normalized_query, top_k=top_k)
         return self.search_classical(normalized_query, top_k=top_k)
@@ -226,6 +236,79 @@ class QuijoteSearchService:
         engine = self.load_semantic_engine()
         embedder = self._semantic_embedder()
         return engine.search(query, chunks, embedder, top_k=top_k)
+
+    def retrieve_rag_sources(
+        self, query: str, top_k: int | None = None
+    ) -> list[RagSource]:
+        """Recupera y fusiona fuentes candidatas para el modo RAG."""
+
+        self._ensure_rag_enabled()
+
+        candidate_top_k = max(
+            top_k or self.settings.rag_hybrid_top_k,
+            self.settings.rag_hybrid_top_k,
+        )
+        classical_results = self.search_classical(query, top_k=candidate_top_k)
+        semantic_results = self.search_semantic(query, top_k=candidate_top_k)
+
+        retriever = HybridRetriever(
+            classical_weight=self.settings.rag_classical_weight,
+            semantic_weight=self.settings.rag_semantic_weight,
+            rrf_k=self.settings.rag_rrf_k,
+        )
+        return retriever.combine(
+            query=query,
+            classical_results=classical_results,
+            semantic_results=semantic_results,
+            top_k=candidate_top_k,
+        )
+
+    def answer_rag(
+        self, query: str, max_sources: int | None = None
+    ) -> RagResponse:
+        """Genera una respuesta RAG grounded sobre fuentes híbridas."""
+
+        normalized_query = query.strip()
+        if not normalized_query:
+            raise ConfigurationError("La consulta RAG no puede estar vacía.")
+
+        rag_sources = self.retrieve_rag_sources(normalized_query)
+        context_builder = ContextBuilder(
+            max_sources=max_sources or self.settings.rag_max_sources,
+            max_context_chars=self.settings.rag_max_context_chars,
+            max_source_chars=self.settings.rag_max_source_chars,
+        )
+        context = context_builder.build(rag_sources)
+        if not context.sources:
+            return RagResponse(
+                query=normalized_query,
+                answer=(
+                    "No he encontrado fragmentos suficientes para responder "
+                    "con trazabilidad a partir del corpus recuperado."
+                ),
+                sources=[],
+                references=[],
+                model=self.settings.rag_generation_model,
+                context="",
+                metadata={
+                    "mode": "rag",
+                    "insufficient_evidence": True,
+                    "used_source_count": 0,
+                    "available_source_count": 0,
+                },
+            )
+
+        generator = OllamaRagGenerator(
+            host=self.settings.ollama_host,
+            model=self.settings.rag_generation_model,
+            temperature=self.settings.rag_temperature,
+            num_predict=self.settings.rag_num_predict,
+            timeout_seconds=self.settings.ollama_timeout_seconds,
+        )
+        try:
+            return generator.generate(normalized_query, context)
+        except RagGenerationError:
+            raise
 
     def describe_artifacts(self) -> dict[str, Any]:
         """Devuelve un resumen ligero del estado de los artefactos."""
@@ -302,3 +385,10 @@ class QuijoteSearchService:
             model_name=self.settings.spacy_model,
             batch_size=self.settings.semantic_batch_size,
         )
+
+    def _ensure_rag_enabled(self) -> None:
+        if not self.settings.rag_enabled:
+            raise ConfigurationError(
+                "El modo RAG está desactivado en la configuración actual. "
+                "Actívalo con `QUIJOTE_RAG__ENABLED=true` o en `settings.toml`."
+            )

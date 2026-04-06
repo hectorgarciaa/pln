@@ -14,7 +14,7 @@ Repositorio único para las cuatro prácticas de Procesamiento del Lenguaje Natu
 ├── p1/  # Bot negociador autónomo
 ├── p2/  # Materiales y memoria de audio
 ├── p3/  # Conversor UTF-8 <-> PLNCG26
-└── p4/  # Buscador clásico + semántico sobre el Quijote
+└── p4/  # Buscador clásico + semántico + RAG sobre el Quijote
 ```
 
 ## Cómo usar uv sin romper el repo

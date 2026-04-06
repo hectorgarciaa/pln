@@ -19,3 +19,7 @@ class ResourceOutOfDateError(QuijoteIRError):
 
 class SemanticModelError(QuijoteIRError):
     """Se lanza cuando la búsqueda semántica no puede usar el modelo vectorial requerido."""
+
+
+class RagGenerationError(QuijoteIRError):
+    """Se lanza cuando el LLM devuelve una respuesta RAG inválida o no trazable."""

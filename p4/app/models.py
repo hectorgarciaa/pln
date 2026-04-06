@@ -107,3 +107,42 @@ class SearchResult:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(slots=True)
+class RagSource:
+    """Fuente recuperada para construir y justificar una respuesta RAG."""
+
+    rank: int
+    source_id: str
+    chunk_id: str
+    document_id: str
+    part: str
+    title: str
+    score: float
+    fragment: str
+    text: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+    explanation: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class RagResponse:
+    """Respuesta final generada por el flujo RAG con sus fuentes."""
+
+    query: str
+    answer: str
+    sources: list[RagSource]
+    references: list[str]
+    model: str
+    context: str
+    raw_response: str = ""
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload["sources"] = [source.to_dict() for source in self.sources]
+        return payload
