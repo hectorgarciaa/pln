@@ -1,0 +1,19 @@
+[project]
+name = "fdi-pln-2602-p1"
+version = "1.0.0"
+description = "Bot negociador autónomo para la práctica 1 de PLN"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.3.1",
+    "loguru>=0.7.3",
+    "ollama>=0.6.1",
+    "pydantic>=2.12.5",
+    "pydantic-ai>=1.57.0",
+    "python-dotenv>=1.1.0",
+    "requests>=2.32.5",
+    "rich>=14.3.2",
+]
+
+[tool.uv]
+package = false

@@ -14,13 +14,12 @@ build/
 # --- Entornos Virtuales ---
 # En tu imagen se ve la carpeta .venv, es fundamental ignorarla
 .venv/
+.uv-cache/
 venv/
 env/
 
 # --- Gestión de dependencias (uv / pip) ---
-# Ignoramos uv.lock si prefieres que cada entorno lo genere, 
-# aunque en proyectos finales se suele subir. Por ahora lo dejamos fuera si es desarrollo local.
-# uv.lock 
+# Los `uv.lock` por práctica sí se versionan para fijar entornos reproducibles.
 
 # --- Logs y Datos temporales ---
 p1/app/logs/

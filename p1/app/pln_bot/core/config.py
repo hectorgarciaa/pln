@@ -2,8 +2,8 @@
 Configuración centralizada del proyecto.
 
 Usa pydantic BaseModel para validar tipos y valores por defecto.
-Carga automáticamente un archivo .env en la raíz del proyecto
-(si existe) mediante python-dotenv.
+Carga automáticamente un archivo `.env` en la raíz de `p1`
+(si existe) mediante `python-dotenv`.
 
 Toda la configuración se resuelve en un único punto:
   1. Variables de entorno (máxima prioridad)
@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from typing import Dict, List, Tuple
 
-# ── Carga de .env (raíz del proyecto) ────────────────────────────────────
+# ── Carga de .env (raíz de la práctica 1) ────────────────────────────────
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 load_dotenv(_PROJECT_ROOT / ".env", override=False)
 

@@ -41,7 +41,6 @@ def load_settings() -> AppSettings:
 
     project_dir = Path(__file__).resolve().parents[1]
     repo_root = project_dir.parent
-    load_dotenv(repo_root / ".env", override=False)
     load_dotenv(project_dir / ".env", override=False)
 
     dynasettings = Dynaconf(

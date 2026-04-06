@@ -46,11 +46,14 @@ El bot opera en un bucle de rondas: lee su buzón, clasifica cada carta (aceptac
 ## Instalación
 
 ```bash
-# 1. Instalar dependencias del proyecto
-uv sync
+# 1. Instalar dependencias de la práctica 1
+uv sync --project p1
 
 # 2. Descargar el modelo de lenguaje recomendado
 ollama pull qwen3:8b
+
+# 3. Opcional: preparar configuración local
+cp p1/.env.example p1/.env
 ```
 
 ### Dependencias principales
@@ -74,20 +77,20 @@ ollama pull qwen3:8b
 | `FDI_PLN__OLLAMA_URL` | URL del servidor Ollama | `http://127.0.0.1:11434` |
 | `FDI_PLN__MODELO` | Modelo de IA por defecto | `qwen3:8b` |
 
-Se pueden definir en un archivo `.env` en la raíz del proyecto (cargado automáticamente vía `python-dotenv`) o como variables de entorno del sistema. Las variables de entorno tienen prioridad sobre el `.env`.
+Se pueden definir en `p1/.env` o como variables de entorno del sistema. Las variables de entorno tienen prioridad sobre el fichero.
 
 ## Ejecución
 
 ### Bot individual (modo directo)
 
 ```bash
-uv run fdi-pln-2602-p1 --alias MiBot --debug
+uv run --project p1 python p1/main.py --alias MiBot --debug
 ```
 
 ### Menú interactivo
 
 ```bash
-uv run fdi-pln-2602-p1
+uv run --project p1 python p1/main.py
 ```
 
 El menú permite:
@@ -97,8 +100,8 @@ El menú permite:
 ### Varios bots en paralelo (orquestador)
 
 ```bash
-uv run app/test_runner.py -n 3 --consola     # salida coloreada en terminal
-uv run app/test_runner.py -n 5 -d            # 5 bots, logs a fichero
+uv run --project p1 python p1/app/test_runner.py -n 3 --consola
+uv run --project p1 python p1/app/test_runner.py -n 5 -d
 ```
 
 El orquestador (`test_runner.py`) lanza N subprocesos independientes, cada uno ejecutando `main.py` con un alias único (`Bot_1`, `Bot_2`, …). Soporta cierre limpio con `Ctrl+C`.
