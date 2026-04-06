@@ -52,6 +52,8 @@ class AppSettings:
     rag_classical_weight: float
     rag_semantic_weight: float
     rag_rrf_k: int
+    rag_min_score_ratio: float
+    rag_semantic_only_zero_overlap_penalty: float
 
 
 @lru_cache(maxsize=1)
@@ -118,6 +120,10 @@ def load_settings() -> AppSettings:
         rag_classical_weight=float(dynasettings.rag.classical_weight),
         rag_semantic_weight=float(dynasettings.rag.semantic_weight),
         rag_rrf_k=int(dynasettings.rag.rrf_k),
+        rag_min_score_ratio=float(dynasettings.rag.min_score_ratio),
+        rag_semantic_only_zero_overlap_penalty=float(
+            dynasettings.rag.semantic_only_zero_overlap_penalty
+        ),
     )
 
 

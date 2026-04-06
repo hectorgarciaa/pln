@@ -291,6 +291,8 @@ class QuijoteSearchService:
             classical_weight=self.settings.rag_classical_weight,
             semantic_weight=self.settings.rag_semantic_weight,
             rrf_k=self.settings.rag_rrf_k,
+            min_score_ratio=self.settings.rag_min_score_ratio,
+            semantic_only_zero_overlap_penalty=self.settings.rag_semantic_only_zero_overlap_penalty,
         )
         return retriever.combine(
             query=query,

@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
+from p4.conf import STOPWORDS_ES
 from p4.app.models import RagSource, SearchResult
+from p4.app.utils import normalize_token
+
+
+WORD_RE = re.compile(r"\w+", flags=re.UNICODE)
 
 
 @dataclass(slots=True)
@@ -14,6 +20,8 @@ class HybridRetriever:
     classical_weight: float
     semantic_weight: float
     rrf_k: int = 10
+    min_score_ratio: float = 0.96
+    semantic_only_zero_overlap_penalty: float = 0.3
 
     def combine(
         self,
@@ -27,6 +35,7 @@ class HybridRetriever:
         if top_k <= 0:
             return []
 
+        query_terms = _query_terms(query)
         buckets: dict[str, dict[str, object]] = {}
         self._merge_results(
             query=query,
@@ -42,9 +51,10 @@ class HybridRetriever:
             results=semantic_results,
             buckets=buckets,
         )
+        self._tighten_candidates(buckets=buckets, query_terms=query_terms)
 
         ranked = sorted(
-            buckets.values(),
+            self._filter_by_score_ratio(buckets.values()),
             key=lambda item: (-float(item["score"]), str(item["chunk_id"])),
         )
 
@@ -57,6 +67,9 @@ class HybridRetriever:
                     "query": query,
                     "fusion_method": "weighted normalized score + reciprocal rank fusion",
                     "retrieval_modes": sorted(item["modes"]),
+                    "lexical_overlap_ratio": round(
+                        float(item.get("lexical_overlap_ratio", 0.0)), 6
+                    ),
                 }
             )
             sources.append(
@@ -124,3 +137,86 @@ class HybridRetriever:
                 entry["fragment"] = result.fragment
                 entry["text"] = result.text
                 entry["metadata"] = dict(result.metadata)
+
+    def _tighten_candidates(
+        self, *, buckets: dict[str, dict[str, object]], query_terms: set[str]
+    ) -> None:
+        for entry in buckets.values():
+            overlap_ratio = _lexical_overlap_ratio(
+                query_terms=query_terms,
+                title=str(entry["title"]),
+                text=str(entry["text"]),
+            )
+            entry["lexical_overlap_ratio"] = overlap_ratio
+            explanation = entry["explanation"]
+            explanation["lexical_overlap_ratio"] = round(overlap_ratio, 6)
+
+            modes = set(entry["modes"])
+            if (
+                modes == {"semantic"}
+                and overlap_ratio == 0.0
+                and self.semantic_only_zero_overlap_penalty > 0
+            ):
+                original_score = float(entry["score"])
+                penalized_score = original_score * (
+                    1.0 - self.semantic_only_zero_overlap_penalty
+                )
+                entry["score"] = max(penalized_score, 0.0)
+                explanation["semantic_only_penalty_applied"] = True
+                explanation["semantic_only_penalty"] = round(
+                    self.semantic_only_zero_overlap_penalty, 6
+                )
+                explanation["score_before_penalty"] = round(original_score, 6)
+                explanation["score_after_penalty"] = round(float(entry["score"]), 6)
+            else:
+                explanation["semantic_only_penalty_applied"] = False
+
+    def _filter_by_score_ratio(
+        self, entries: object
+    ) -> list[dict[str, object]]:
+        ranked_entries = list(entries)
+        if not ranked_entries:
+            return []
+
+        best_score = max(float(item["score"]) for item in ranked_entries)
+        if best_score <= 0:
+            return ranked_entries
+
+        cutoff = best_score * self.min_score_ratio
+        filtered = [
+            item for item in ranked_entries if float(item["score"]) >= cutoff
+        ]
+        if filtered:
+            return filtered
+        return sorted(
+            ranked_entries,
+            key=lambda item: (-float(item["score"]), str(item["chunk_id"])),
+        )[:1]
+
+
+def _query_terms(query: str) -> set[str]:
+    stopwords = {normalize_token(word) for word in STOPWORDS_ES}
+    terms: set[str] = set()
+    for raw_token in WORD_RE.findall(query):
+        token = normalize_token(raw_token)
+        if len(token) < 2 or token in stopwords:
+            continue
+        terms.add(token)
+    return terms
+
+
+def _lexical_overlap_ratio(*, query_terms: set[str], title: str, text: str) -> float:
+    if not query_terms:
+        return 0.0
+
+    candidate_terms: set[str] = set()
+    for raw_token in WORD_RE.findall(f"{title} {text}"):
+        token = normalize_token(raw_token)
+        if len(token) >= 2:
+            candidate_terms.add(token)
+
+    if not candidate_terms:
+        return 0.0
+
+    overlap = query_terms & candidate_terms
+    return len(overlap) / len(query_terms)
