@@ -152,16 +152,30 @@ Desde la raíz del monorepo:
 ```bash
 uv sync --project p4
 uv run --project p4 python -m spacy download es_core_news_lg
+uv run --project p4 python -m p4.main build-all
+uv run --project p4 fdi-pln-2602-p4
 ollama pull qwen3:8b
+ollama serve
 ```
 
-Si quieres ajustar parámetros, copia:
+Si prefieres usar el lanzador de la raíz del monorepo:
 
 ```bash
-cp p4/.env.example p4/.env
+uv sync
+uv run python -m spacy download es_core_news_lg
+uv run fdi-pln-2602-p4 build-all
+uv run fdi-pln-2602-p4
+ollama pull qwen3:8b
+ollama serve
 ```
 
-y modifica las variables `QUIJOTE_*`.
+Si quieres ajustar parámetros, puedes editar:
+
+```bash
+p4/.env
+```
+
+También puedes tomar como referencia `p4/.env.example` y modificar las variables `QUIJOTE_*`.
 
 ## Preparación inicial recomendada
 
@@ -189,10 +203,16 @@ Si entras en `p4/`, el programa puede arrancarse directamente con:
 uv run fdi-pln-2602-p4
 ```
 
-Desde la raíz del monorepo, el comando equivalente es:
+Desde la raíz del monorepo, puedes usar el proyecto de `p4` explícitamente:
 
 ```bash
 uv run --project p4 fdi-pln-2602-p4
+```
+
+Y también puedes usar el lanzador de la raíz:
+
+```bash
+uv run fdi-pln-2602-p4
 ```
 
 ### Abrir la TUI
@@ -211,6 +231,12 @@ o usando el ejecutable instalado del proyecto:
 
 ```bash
 uv run --project p4 fdi-pln-2602-p4
+```
+
+Desde la raíz del monorepo también funciona:
+
+```bash
+uv run fdi-pln-2602-p4
 ```
 
 ### Buscar desde la CLI
@@ -548,6 +574,11 @@ Eso no rompe:
 
 Solo afecta al modo RAG.
 
+Para que el modo RAG funcione, hacen falta las dos cosas:
+
+- `ollama pull qwen3:8b`
+- `ollama serve`
+
 ### 2. La semántica con spaCy funciona, pero no siempre es brillante
 
 La búsqueda semántica usa `es_core_news_lg`, que ofrece vectores útiles, pero no es un sistema moderno especializado en embeddings de alta calidad.
@@ -602,6 +633,12 @@ Solución:
 
 ```bash
 uv run --project p4 python -m spacy download es_core_news_lg
+```
+
+Desde la raíz del monorepo también puedes hacer:
+
+```bash
+uv run python -m spacy download es_core_news_lg
 ```
 
 ### Ollama no está activo

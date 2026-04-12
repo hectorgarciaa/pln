@@ -69,10 +69,31 @@ Detalles en `p3/README.md`.
 
 ### P4
 
+La práctica 4 puede ejecutarse de dos formas.
+
+Usando el proyecto propio de `p4`:
+
 ```bash
 uv sync --project p4
 uv run --project p4 python -m spacy download es_core_news_lg
+uv run --project p4 python -m p4.main build-all
 uv run --project p4 fdi-pln-2602-p4
+```
+
+Usando el lanzador de la raíz del monorepo:
+
+```bash
+uv sync
+uv run python -m spacy download es_core_news_lg
+uv run fdi-pln-2602-p4 build-all
+uv run fdi-pln-2602-p4
+```
+
+Para usar el modo `rag`, además hace falta tener Ollama levantado y el modelo descargado:
+
+```bash
+ollama pull qwen3:8b
+ollama serve
 ```
 
 Detalles en `p4/README.md`.
