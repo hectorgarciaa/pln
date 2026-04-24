@@ -2,9 +2,6 @@ import json
 from pathlib import Path
 from .train import train_model
 
-# Listas de hiperparámetros a probar (OPTIMIZADOS SEGÚN ANÁLISIS)
-# Total de experimentos: 3 × 3 × 1 × 2 × 1 × 1 × 1 × 2 × 2 = 72 ✅
-
 # PARÁMETROS CRÍTICOS (exploración activa):
 vocab_sizes = [128, 256, 350]          # Expandir hacia valores menores (256 fue mejor)
 dim_embeddings = [40, 64, 128]         # Aumentar capacidad (64 fue mejor que 32)
@@ -16,10 +13,10 @@ num_heads_list = [2]                   # Mejor encontrado, mínimo impacto
 epochs_list = [5]                      # Más iteraciones para convergencia
 batch_sizes = [16]                     # Mantener constante
 
-# 📊 PARÁMETROS CON IMPACTO MÍNIMO (máximo 2 valores):
+# PARÁMETROS CON IMPACTO MÍNIMO (máximo 2 valores):
 seq_lens = [64, 128]                   # Mantener los 2 originales
 
-# 🚀 NUEVOS PARÁMETROS A EXPLORAR (antes eran solo 1):
+# NUEVOS PARÁMETROS A EXPLORAR (antes eran solo 1):
 learning_rates = [1e-4, 5e-4]          # Explorar rango de tasas
 
 results = []
